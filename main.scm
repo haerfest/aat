@@ -8,7 +8,7 @@
 
 (define (main)
   (let ((gzipped-uef-archive (make <gzipped-uef-archive>)))
-    (open-file "Forth_E.uef" gzipped-uef-archive)))
+    (open-file "Forth_E.uef" gzipped-uef-archive)
+    (display (iterate gzipped-uef-archive))))
 
-(display (main))
-(newline)
+(main)
