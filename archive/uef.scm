@@ -1,12 +1,16 @@
+;; http://electrem.emuunlim.com/UEFSpecs.htm
+
 (module uef
   (<uef-archive> open-port open-file iterate)
 
   (import
     (chicken base)
     (chicken io)
+    (chicken format)
     (chicken pathname)
     (chicken port)
     coops
+    file
     scheme)
 
   (define-class <uef-archive> ()
@@ -30,8 +34,8 @@
   
   (define (read-chunk port)
     (let* ((identifier (read-u16 port))
-          (length     (read-u32 port))
-          (content    (read-string length port)))
+           (length     (read-u32 port))
+           (content    (read-string length port)))
       (list identifier length content)))
 
   (define (read-chunks port)
@@ -54,5 +58,22 @@
         (lambda (port) (open-port port archive))
         #:binary)))
   
+  (define (parse-block block)
+    (define (find-null index)
+      (if (or (= index (string-length block))
+              (eq? #\null (string-ref block index)))
+        index
+        (find-null (+ index 1))))
+    (let ((n (find-null 0)))
+      (substring block 0 (- n 1))))
+  
+  (define (parse-chunk chunk)
+    (let ((identifier (car chunk))
+          (length     (cadr chunk))
+          (content   (caddr chunk)))
+      (if (or (= #x0100 identifier) (= #x0102 identifier))
+        (parse-block content)
+        (format #f "0x~X" identifier))))
+
   (define-method (iterate (archive <uef-archive>))
-    (slot-value archive 'chunks)))
+    (map parse-chunk (slot-value archive 'chunks))))
