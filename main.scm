@@ -1,6 +1,6 @@
-(load "archive/file")
-(load "archive/uef")
-(load "archive/gzipped-uef")
+(load "file")
+(load "uef")
+(load "gzipped-uef")
 
 (import
   (aat gzipped-uef)
