@@ -1,12 +1,12 @@
-(module gzipped-uef
+(module (aat gzipped-uef)
   (<gzipped-uef-archive> open-port open-file iterate)
 
   (import
+    (aat uef)
     (chicken io)
     (chicken pathname)
     coops
     scheme
-    uef
     z3
     zlib)
 

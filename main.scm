@@ -3,8 +3,8 @@
 (load "archive/gzipped-uef")
 
 (import
-  gzipped-uef
-  uef
+  (aat gzipped-uef)
+  (aat uef)
   coops)
 
 (define (main)

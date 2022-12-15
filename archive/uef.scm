@@ -1,16 +1,16 @@
 ;; http://electrem.emuunlim.com/UEFSpecs.htm
 
-(module uef
+(module (aat uef)
   (<uef-archive> open-port open-file iterate)
 
   (import
+    (aat file)
     (chicken base)
     (chicken io)
     (chicken format)
     (chicken pathname)
     (chicken port)
     coops
-    file
     scheme)
 
   (define-class <uef-archive> ()

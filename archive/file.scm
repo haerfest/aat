@@ -1,4 +1,4 @@
-(module file
+(module (aat file)
   (<file-archive> open-port open-file iterate)
 
   (import
