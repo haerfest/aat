@@ -1,5 +1,5 @@
 (module (aat file)
-  (<file-archive> open-port open-file iterate)
+  (<file> contents attributes set-attribute)
 
   (import
     (chicken io)
@@ -7,17 +7,13 @@
     coops
     scheme)
 
-  (define-class <file-archive> ()
-    ((contents '())))
+  (define-class <file> ()
+    ((contents initform: '() accessor: contents)
+     (attributes initform: '() accessor: attributes)))
 
-  (define-method (open-port (port #t) (archive <file-archive>))
-    (set! (slot-value archive 'contents) (read-string #f port)))
-
-  (define-method (open-file (filepath #t) (archive <file-archive>))
-    (call-with-input-file
-      filepath
-      (lambda (port) (open-port port archive))
-      #:binary))
-  
-  (define-method (iterate (archive <file-archive>))
-    (list archive)))
+  (define-method (set-attribute (attribute #t) (value #t) (file <file>))
+    (let ((existing (assq attribute (attributes file))))
+      (if (not existing)
+        (set! (attributes file)
+              (cons (cons attribute value) (attributes file)))
+        (set! (cdr existing) value)))))
