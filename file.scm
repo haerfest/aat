@@ -1,5 +1,5 @@
 (module (aat file)
-  (<file> contents attributes set-attribute)
+  (<file> data attributes append-data! set-attribute!)
 
   (import
     (chicken io)
@@ -8,10 +8,13 @@
     scheme)
 
   (define-class <file> ()
-    ((contents initform: '() accessor: contents)
+    ((data accessor: data)
      (attributes initform: '() accessor: attributes)))
 
-  (define-method (set-attribute (attribute #t) (value #t) (file <file>))
+  (define-method (append-data! (data #t) (file <file>))
+    #f)
+  
+  (define-method (set-attribute! (attribute #t) (value #t) (file <file>))
     (let ((existing (assq attribute (attributes file))))
       (if (not existing)
         (set! (attributes file)

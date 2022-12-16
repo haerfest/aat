@@ -1,4 +1,4 @@
 # aat
 Acorn Archive Tool
 
-    $ chicken-install coops z3 zlib
+    $ chicken-install bitstring coops z3

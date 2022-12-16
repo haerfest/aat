@@ -1,15 +1,14 @@
 (load "file")
 (load "uef")
-(load "gzipped-uef")
 
 (import
-  (aat gzipped-uef)
+  (aat file)
   (aat uef)
   coops)
 
 (define (main)
-  (let ((gzipped-uef-archive (make <gzipped-uef-archive>)))
-    (open-file "media/Forth_E.uef" gzipped-uef-archive)
-    (display (iterate gzipped-uef-archive))))
+  (let ((archive (make <uef>)))
+    (open-file "media/Forth_E.uef" archive)
+    (display (iterate archive))))
 
 (main)
