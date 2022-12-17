@@ -1,7 +1,9 @@
 (module (aat file)
-  (<file> data attribute attributes append-data! set-attribute!)
+  (<file> data fmt attribute attributes append-data! set-attribute!)
 
   (import
+    (chicken base)
+    (chicken format)
     (chicken io)
     (chicken pathname)
     coops
@@ -11,8 +13,19 @@
     ((data initform: "" accessor: data)
      (attributes initform: '() accessor: attributes)))
 
+  (define-method (fmt (file <file>))
+    (apply string-append
+      (map
+        (lambda (attr)
+          (let ((value (cdr attr)))
+            (if (fixnum? value)
+              (format #f " ~S:#x~X" (car attr) value)
+              (format #f " ~S:~A" (car attr) value))))
+        (reverse (attributes file)))))
+  
   (define-method (append-data! (new-data #t) (file <file>))
-    (set! (data file) (string-append (data file) new-data)))
+    (set! (data file) (string-append (data file) new-data))
+    (set-attribute! 'size (string-length (data file)) file))
   
   (define-method (attribute (attr #t) (file <file>))
     (assq attr (attributes file)))

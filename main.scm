@@ -9,11 +9,11 @@
 
 (define (main)
   (let ((archive (make <uef>)))
-    (open-file "media/Forth_E.uef" archive)
+    (open-file "media/Hopper_E.uef" archive)
     (format #t "UEF version: ~A~%" (version archive))
-    (map
+    (for-each
       (lambda (file)
-        (format #t "filename: ~A~%" (attribute 'filename file)))
+        (format #t "[[ ~A ]]~%" (fmt file)))
       (files archive))))
 
 (main)

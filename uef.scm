@@ -6,6 +6,7 @@
     bitstring
     (chicken base)
     (chicken bitwise)
+    (chicken format)
     (chicken io)
     (chicken pathname)
     (chicken port)
@@ -111,7 +112,9 @@
         (unless (zero? (size block))
           (append-data! (data block) file))
         (if (bit->boolean (flag block) 7)
-          file
+          (begin
+            (format #t "File: last block~%")
+            file)
           (assemble-blocks (parse-block (data (read-next-file-chunk port))))))
       (let ((block (parse-block (data chunk))))
         (set-attribute! 'filename (filename block) file)
