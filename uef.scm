@@ -104,7 +104,8 @@
   (define (assemble-file-chunks chunk port)
     (let ((file (make <file>)))
       (define (assemble-blocks block)
-        (append-data! (data block) file)
+        (unless (bit->boolean (flag block) 6)
+          (append-data! (data block) file))
         (if (bit->boolean (flag block) 7)
           file
           (assemble-blocks (parse-block (data (read-next-file-chunk port))))))
@@ -112,6 +113,7 @@
         (set-attribute! 'filename (filename block) file)
         (set-attribute! 'load-addr (load-addr block) file)
         (set-attribute! 'exec-addr (exec-addr block) file)
+        (set-attribute! 'run-only (bit->boolean (flag block) 0) file)
         (assemble-blocks block))))
 
   ;; Returns whether a chunk represents a file block.
