@@ -1,5 +1,5 @@
 (module (aat file)
-  (<file> data attributes append-data! set-attribute!)
+  (<file> data attribute attributes append-data! set-attribute!)
 
   (import
     (chicken io)
@@ -14,9 +14,12 @@
   (define-method (append-data! (data #t) (file <file>))
     #f)
   
-  (define-method (set-attribute! (attribute #t) (value #t) (file <file>))
-    (let ((existing (assq attribute (attributes file))))
+  (define-method (attribute (attr #t) (file <file>))
+    (assq attr (attributes file)))
+
+  (define-method (set-attribute! (attr #t) (value #t) (file <file>))
+    (let ((existing (assq attr (attributes file))))
       (if (not existing)
         (set! (attributes file)
-              (cons (cons attribute value) (attributes file)))
+              (cons (cons attr value) (attributes file)))
         (set! (cdr existing) value)))))

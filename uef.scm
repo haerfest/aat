@@ -7,7 +7,6 @@
     (chicken base)
     (chicken bitwise)
     (chicken io)
-    (chicken format)
     (chicken pathname)
     (chicken port)
     coops
@@ -22,8 +21,7 @@
      (data accessor: data)))
 
   ;; A file is usually stored in multiple blocks on tape. A single block is
-  ;; represented by this block class. See page 177 of the Acorn Electron
-  ;; Advanced User Guide, describing the *ROM filing system data format.
+  ;; represented by this block class.
   (define-class <block> ()
     ((filename accessor: filename)
      (load-addr accessor: load-addr)
@@ -38,7 +36,7 @@
   (define (filename-length data #!optional (index 1))
     (cond
       ((= index (min 11 (string-length data))) (- index 1))
-      ((eq? #\null (string-ref index data)) (- index 1))
+      ((eq? #\null (string-ref data index)) (- index 1))
       (else (filename-length data (+ index 1)))))
   
   (define-class <uef> ()
@@ -61,10 +59,12 @@
               (set! (data chunk) (read-string Size port))
               chunk))))))
 
+  (define (bitstring->string x)
+    (list->string (map integer->char (bitstring->list x 8))))
+
   (define (parse-block data)
     (let ((n (filename-length data))
           (block (make <block>)))
-      (display (char->integer (string-ref data 0))) (newline)
       (bitmatch data
         (((#x2A)
           (Filename (* 8 n) bitstring)
@@ -74,12 +74,12 @@
           (Number 16 little unsigned)
           (Size 16 little unsigned)
           (Flag 8 unsigned)
-          (AddressNextFile 16 little unsigned)
+          (AddressNextFile 32 little unsigned)
           (HeaderCrc 16 little unsigned)
-          (Data (* 8 size) bitstring)
+          (Data (* 8 Size) bitstring)
           (DataCrc 16 little unsigned))
          (begin
-          (set! (slot-value block 'filename) Filename)
+          (set! (slot-value block 'filename) (bitstring->string Filename))
           (set! (slot-value block 'load-addr) LoadAddr)
           (set! (slot-value block 'exec-addr) ExecAddr)
           (set! (slot-value block 'number) Number)
@@ -104,8 +104,10 @@
         (assemble-blocks block))))
 
   (define (file-chunk? chunk)
-    (or (= #x0100 (identifier chunk))
-        (= #x0102 (identifier chunk))))
+    (and
+      (or (= #x0100 (identifier chunk))
+          (= #x0102 (identifier chunk)))
+      (eq? #\* (string-ref (data chunk) 0))))
 
   (define (read-next-file-chunk port)
     (let ((chunk (read-chunk port)))
@@ -117,8 +119,8 @@
   (define (read-file port)
     (let ((chunk (read-next-file-chunk port)))
       (if (eq? #!eof chunk)
-        #!eof)
-        (assemble-file-chunks chunk port)))
+        #!eof
+        (assemble-file-chunks chunk port))))
 
   (define (read-files port)
     (port-fold cons '() (lambda () (read-file port))))
