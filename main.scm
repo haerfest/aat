@@ -10,9 +10,10 @@
 (define (main)
   (let ((archive (make <uef>)))
     (open-file "media/Forth_E.uef" archive)
+    (format #t "UEF version: ~A~%" (version archive))
     (map
       (lambda (file)
         (format #t "filename: ~A~%" (attribute 'filename file)))
-      (iterate archive))))
+      (files archive))))
 
 (main)

@@ -1,5 +1,5 @@
 (module (aat uef)
-  (<uef> open-port open-file iterate)
+  (<uef> open-port open-file version files)
 
   (import
     (aat file)
@@ -11,6 +11,11 @@
     (chicken port)
     coops
     scheme)
+
+  ;; Represents a UEF archive.
+  (define-class <uef> ()
+    ((version accessor: version)
+     (files initform: '() accessor: files)))
 
   ;; The chunk class represents a UEF chunk. Each chunk consists of a numeric
   ;; identifier, a length, and a payload. The identifier determines how the
@@ -33,20 +38,21 @@
      (data accessor: data)
      (data-crc accessor: data-crc)))
 
+  ;; The filename in a block is of variable length and null-terminated. It
+  ;; starts at index 1, right after the synchronisation byte, and is up to
+  ;; ten characters in length. This function returns its length.
   (define (filename-length data #!optional (index 1))
     (cond
       ((= index (min 11 (string-length data))) (- index 1))
       ((eq? #\null (string-ref data index)) (- index 1))
       (else (filename-length data (+ index 1)))))
   
-  (define-class <uef> ()
-    ((version accessor: version)
-     (files initform: '() accessor: files)))
-
+  ;; Reads the version number from a UEF archive.
   (define (read-version port)
     (bitmatch (read-string 2 port)
       (((minor 8 unsigned) (major 8 unsigned)) (cons major minor))))
   
+  ;; Reads the next <chunk> from a UEF archive. Possibly returns #!eof.
   (define (read-chunk port)
     (if (eq? #!eof (peek-char port))
       #!eof
@@ -59,13 +65,15 @@
               (set! (data chunk) (read-string Size port))
               chunk))))))
 
+  ;; Transforms a bitstring into a regular string.
   (define (bitstring->string x)
     (list->string (map integer->char (bitstring->list x 8))))
 
-  (define (parse-block data)
-    (let ((n (filename-length data))
+  ;; Parses a single tape block and returns a <block>.
+  (define (parse-block chunk-data)
+    (let ((n (filename-length chunk-data))
           (block (make <block>)))
-      (bitmatch data
+      (bitmatch chunk-data
         (((#x2A)
           (Filename (* 8 n) bitstring)
           (#x00)
@@ -79,22 +87,25 @@
           (Data (* 8 Size) bitstring)
           (DataCrc 16 little unsigned))
          (begin
-          (set! (slot-value block 'filename) (bitstring->string Filename))
-          (set! (slot-value block 'load-addr) LoadAddr)
-          (set! (slot-value block 'exec-addr) ExecAddr)
-          (set! (slot-value block 'number) Number)
-          (set! (slot-value block 'size) Size)
-          (set! (slot-value block 'flag) Flag)
-          (set! (slot-value block 'header-crc) HeaderCrc)
-          (set! (slot-value block 'data) Data)
-          (set! (slot-value block 'data-crc) DataCrc)
+          (set! (filename block) (bitstring->string Filename))
+          (set! (load-addr block) LoadAddr)
+          (set! (exec-addr block) ExecAddr)
+          (set! (number block) Number)
+          (set! (size block) Size)
+          (set! (flag block) Flag)
+          (set! (header-crc block) HeaderCrc)
+          (set! (data block) Data)
+          (set! (data-crc block) DataCrc)
           block)))))
 
+  ;; Assembles a single file from sequential chunks. The chunk argument is
+  ;; the first chunk of the file. No checks are performed whether subsequent
+  ;; chunks are in the right order or even of the same file.
   (define (assemble-file-chunks chunk port)
     (let ((file (make <file>)))
       (define (assemble-blocks block)
         (append-data! (data block) file)
-        (if (bitwise-and #x80 (flag block))
+        (if (bit->boolean (flag block) 7)
           file
           (assemble-blocks (parse-block (data (read-next-file-chunk port))))))
       (let ((block (parse-block (data chunk))))
@@ -103,12 +114,15 @@
         (set-attribute! 'exec-addr (exec-addr block) file)
         (assemble-blocks block))))
 
+  ;; Returns whether a chunk represents a file block.
   (define (file-chunk? chunk)
     (and
       (or (= #x0100 (identifier chunk))
           (= #x0102 (identifier chunk)))
       (eq? #\* (string-ref (data chunk) 0))))
 
+  ;; Locates and returns the next file chunk in the UEF archive, skipping
+  ;; any non-file chunks. Possibly returns #!eof.
   (define (read-next-file-chunk port)
     (let ((chunk (read-chunk port)))
       (cond
@@ -116,15 +130,17 @@
         ((file-chunk? chunk) chunk)
         (else (read-next-file-chunk port)))))
 
+  ;; Reads the next file form a UEF archive. Possibly returns #!eof.
   (define (read-file port)
     (let ((chunk (read-next-file-chunk port)))
       (if (eq? #!eof chunk)
         #!eof
         (assemble-file-chunks chunk port))))
 
+  ;; Reads all files from a UEF archive.
   (define (read-files port)
-    (port-fold cons '() (lambda () (read-file port))))
-          
+    (reverse (port-fold cons '() (lambda () (read-file port)))))
+
   (define-method (open-port (port #t) (archive <uef>))
     (and
       (string=? "UEF File!" (read-string 9 port))
@@ -137,7 +153,4 @@
       (string-ci=? "uef" (pathname-extension filepath))
       (call-with-input-file filepath
         (lambda (port) (open-port port archive))
-        #:binary)))
-  
-  (define-method (iterate (archive <uef>))
-    (files archive)))
+        #:binary))))
