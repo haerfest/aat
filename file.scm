@@ -8,11 +8,11 @@
     scheme)
 
   (define-class <file> ()
-    ((data accessor: data)
+    ((data initform: "" accessor: data)
      (attributes initform: '() accessor: attributes)))
 
-  (define-method (append-data! (data #t) (file <file>))
-    #f)
+  (define-method (append-data! (new-data #t) (file <file>))
+    (set! (data file) (string-append (data file) new-data)))
   
   (define-method (attribute (attr #t) (file <file>))
     (assq attr (attributes file)))

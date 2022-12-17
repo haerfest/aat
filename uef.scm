@@ -98,7 +98,7 @@
               (((Data (* 8 (size block)) bitstring)
                 (DataCrc 16 little unsigned))
                (begin
-                (set! (data block) Data)
+                (set! (data block) (bitstring->string Data))
                 (set! (data-crc block) DataCrc))))))))
       block))
 
