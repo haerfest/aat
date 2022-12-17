@@ -65,11 +65,8 @@
               (set! (data chunk) (read-string Size port))
               chunk))))))
 
-  ;; Transforms a bitstring into a regular string.
-  (define (bitstring->string x)
-    (list->string (map integer->char (bitstring->list x 8))))
-
-  ;; Parses a single tape block and returns a <block>.
+  ;; Parses a single tape block and returns a <block>. See the specification:
+  ;; https://beebwiki.mdfs.net/Acorn_cassette_format#BBC_Micro.2C_Electron_and_Master
   (define (parse-block chunk-data)
     (let ((n (filename-length chunk-data))
           (block (make <block>)))
@@ -84,8 +81,7 @@
           (Flag 8 unsigned)
           (AddressNextFile 32 little unsigned)
           (HeaderCrc 16 little unsigned)
-          (Data (* 8 Size) bitstring)
-          (DataCrc 16 little unsigned))
+          (DataAndCrc bitstring))
          (begin
           (set! (filename block) (bitstring->string Filename))
           (set! (load-addr block) LoadAddr)
@@ -94,9 +90,17 @@
           (set! (size block) Size)
           (set! (flag block) Flag)
           (set! (header-crc block) HeaderCrc)
-          (set! (data block) Data)
-          (set! (data-crc block) DataCrc)
-          block)))))
+          (if (zero? (size block))
+            (begin
+              (set! (data block) "")
+              (set! (data-crc block) 0))
+            (bitmatch DataAndCrc
+              (((Data (* 8 (size block)) bitstring)
+                (DataCrc 16 little unsigned))
+               (begin
+                (set! (data block) Data)
+                (set! (data-crc block) DataCrc))))))))
+      block))
 
   ;; Assembles a single file from sequential chunks. The chunk argument is
   ;; the first chunk of the file. No checks are performed whether subsequent
@@ -104,7 +108,7 @@
   (define (assemble-file-chunks chunk port)
     (let ((file (make <file>)))
       (define (assemble-blocks block)
-        (unless (bit->boolean (flag block) 6)
+        (unless (zero? (size block))
           (append-data! (data block) file))
         (if (bit->boolean (flag block) 7)
           file
@@ -113,7 +117,7 @@
         (set-attribute! 'filename (filename block) file)
         (set-attribute! 'load-addr (load-addr block) file)
         (set-attribute! 'exec-addr (exec-addr block) file)
-        (set-attribute! 'run-only (bit->boolean (flag block) 0) file)
+        (set-attribute! 'locked? (bit->boolean (flag block) 0) file)
         (assemble-blocks block))))
 
   ;; Returns whether a chunk represents a file block.
