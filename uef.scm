@@ -6,7 +6,6 @@
     bitstring
     (chicken base)
     (chicken bitwise)
-    (chicken format)
     (chicken io)
     (chicken pathname)
     (chicken port)
@@ -57,20 +56,19 @@
   (define (read-chunk port)
     (if (eq? #!eof (peek-char port))
       #!eof
-      (let ((chunk (make <chunk>)))
-        (bitmatch (read-string 6 port)
-          (((Identifier 16 little unsigned) (Size 32 little unsigned))
-            (begin
-              (set! (identifier chunk) Identifier)
-              (set! (size chunk) Size)
-              (set! (data chunk) (read-string Size port))
-              chunk))))))
+      (bitmatch (read-string 6 port)
+        (((Identifier 16 little unsigned)
+          (Size 32 little unsigned))
+          (let ((chunk (make <chunk>)))
+            (set! (identifier chunk) Identifier)
+            (set! (size chunk) Size)
+            (set! (data chunk) (read-string Size port))
+            chunk)))))
 
   ;; Parses a single tape block and returns a <block>. See the specification:
   ;; https://beebwiki.mdfs.net/Acorn_cassette_format#BBC_Micro.2C_Electron_and_Master
   (define (parse-block chunk-data)
-    (let ((n (filename-length chunk-data))
-          (block (make <block>)))
+    (let ((n (filename-length chunk-data)))
       (bitmatch chunk-data
         (((#x2A)
           (Filename (* 8 n) bitstring)
@@ -83,7 +81,7 @@
           (AddressNextFile 32 little unsigned)
           (HeaderCrc 16 little unsigned)
           (DataAndCrc bitstring))
-         (begin
+         (let ((block (make <block>)))
           (set! (filename block) (bitstring->string Filename))
           (set! (load-addr block) LoadAddr)
           (set! (exec-addr block) ExecAddr)
@@ -100,8 +98,8 @@
                 (DataCrc 16 little unsigned))
                (begin
                 (set! (data block) (bitstring->string Data))
-                (set! (data-crc block) DataCrc))))))))
-      block))
+                (set! (data-crc block) DataCrc)))))
+          block)))))
 
   ;; Assembles a single file from sequential chunks. The chunk argument is
   ;; the first chunk of the file. No checks are performed whether subsequent
@@ -112,9 +110,7 @@
         (unless (zero? (size block))
           (append-data! (data block) file))
         (if (bit->boolean (flag block) 7)
-          (begin
-            (format #t "File: last block~%")
-            file)
+          file
           (assemble-blocks (parse-block (data (read-next-file-chunk port))))))
       (let ((block (parse-block (data chunk))))
         (set-attribute! 'filename (filename block) file)
@@ -139,7 +135,7 @@
         ((file-chunk? chunk) chunk)
         (else (read-next-file-chunk port)))))
 
-  ;; Reads the next file form a UEF archive. Possibly returns #!eof.
+  ;; Reads the next file from a UEF archive. Possibly returns #!eof.
   (define (read-file port)
     (let ((chunk (read-next-file-chunk port)))
       (if (eq? #!eof chunk)
