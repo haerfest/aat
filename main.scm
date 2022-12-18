@@ -1,21 +1,23 @@
 (load "file")
 (load "dfs")
 (load "uef")
+(load "mmfs")
 
 (import
-  (aat dfs)
+  ;(aat dfs)
   (aat file)
+  (aat mmfs)
   ;(aat uef)
   (chicken format)
   coops)
 
 (define (main)
-  (let ((archive (make <dfs>)))
-    (open-file "media/Elite.ssd" archive)
-    (format #t "Title: ~A~%Sectors: ~A~%" (title archive) (sector-count archive))
+  (let ((archive (make <mmfs>)))
+    (open-file "media/beeb.mmb" archive)
     (for-each
-      (lambda (file)
-        (format #t "~A~%" (fmt file)))
-      (files archive))))
+      (lambda (disk)
+        (when disk
+          (format #t "~A~%" disk)))
+      (vector->list (disks archive)))))
 
 (main)

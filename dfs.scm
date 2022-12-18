@@ -14,6 +14,7 @@
     list-comprehensions
     scheme)
 
+  ;; https://beebwiki.mdfs.net/Acorn_DFS_disc_format
   ;; https://sweh.spuddy.org/Beeb/mmb_utils.html
 
   (define-class <dfs> ()
