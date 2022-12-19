@@ -9,6 +9,8 @@
     coops
     scheme)
 
+  (define-generic (data uef))
+  
   (define-class <file> ()
     ((data initform: "" accessor: data)
      (attributes initform: '() accessor: attributes)))

@@ -1,22 +1,35 @@
+;; -----------------------------------------------------------------------------
+;; Represents an MMFS archive.
+;;
+;; See:
+;; - https://github.com/hoglet67/MMFS
+;; - https://sweh.spuddy.org/Beeb/mmb_utils.html
+;; -----------------------------------------------------------------------------
+
 (module (aat mmfs)
-  (<mmfs> open-port open-file disks)
+  (<mmfs> read-port members)
 
   (import
-    (aat file)
+    (aat archive)
     bitstring
     (chicken base)
-    (chicken bitwise)
-    (chicken format)
     (chicken io)
-    (chicken pathname)
-    (chicken port)
     coops
-    list-comprehensions
     scheme
     srfi-1)
   
-  (define-class <mmfs> ()
+  (define-generic (disks archive))
+
+  (define-class <mmfs> (<archive>)
     ((disks initform: (make-vector 511 #f) accessor: disks)))
+
+  (define-method (read-port (archive <mmfs>) (port #t))
+    (parse-content (read-string (* 100 1024 1024) port) archive))
+
+  (define-method (members (archive <mmfs>))
+    (filter (lambda (disk) disk) (vector->list (disks archive))))
+
+;; -----------------------------------------------------------------------------
 
   (define (null-terminated-bitstring->string bstr)
     (list->string
@@ -25,8 +38,6 @@
         (take-while
           (lambda (ascii) (not (zero? ascii)))
           (bitstring->list bstr 8)))))
-
-  ;; https://sweh.spuddy.org/Beeb/mmb_utils.html
 
   (define (parse-catalog catalog archive #!optional (disk-number 0))
     (when (< disk-number 511)
@@ -43,15 +54,6 @@
   (define (parse-content header archive)
     (bitmatch header
       (((#x00) (#x01) (#x02) (#x03) (#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)
-        (Catalog bitstring))
-       (parse-catalog Catalog archive))))
-
-  (define-method (open-port (port #t) (archive <mmfs>))
-    (parse-content (read-string 8192 port) archive))
-  
-  (define-method (open-file (filepath #t) (archive <mmfs>))
-    (and
-      (string-ci=? "mmb" (pathname-extension filepath))
-      (call-with-input-file filepath
-        (lambda (port) (open-port port archive))
-        #:binary))))
+        (Catalog (* 8 (- 8192 16)) bitstring)
+        (Disks bitstring))
+       (parse-catalog Catalog archive)))))
