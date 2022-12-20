@@ -1,83 +1,100 @@
+;; -----------------------------------------------------------------------------
+;; Represents a UEF (Unified Emulator Format) tape image.
+;;
+;; See:
+;; - http://electrem.emuunlim.com/UEFSpecs.htm
+;; - https://beebwiki.mdfs.net/Acorn_cassette_format
+;; -----------------------------------------------------------------------------
+
 (module (aat uef)
-  (<uef> open-port open-file version files)
+  (<uef> read-port members)
 
   (import
+    (aat archive)
     (aat file)
     bitstring
     (chicken base)
-    (chicken bitwise)
     (chicken io)
-    (chicken pathname)
-    (chicken port)
     coops
-    scheme)
+    scheme
+    srfi-1)
 
-  ;; Represents a UEF archive.
-  (define-class <uef> ()
-    ((version accessor: version)
-     (files initform: '() accessor: files)))
+  (define-class <uef> (<archive>))
 
-  ;; The chunk class represents a UEF chunk. Each chunk consists of a numeric
-  ;; identifier, a length, and a payload. The identifier determines how the
-  ;; payload should be interpreted.
+  (define-method (read-port (tape <uef>) (port #t))
+    (set! (contents tape) (read-string #f port))
+    (parse-contents tape))
+
+;; -----------------------------------------------------------------------------
+
+  (define-method (parse-contents (tape <uef>))
+    (bitmatch (contents tape)
+      ((("UEF File!")
+        (#x00)
+        (VersionMinor 8 unsigned)
+        (VersionMajor 8 unsigned)
+        (Remaining bitstring))
+       (begin
+        (set-meta! tape 'version (cons VersionMajor VersionMinor))
+        (set!
+          (members tape)
+          (blocks->files
+            (map parse-block (filter block? (parse-chunks Remaining)))))))))
+
   (define-class <chunk> ()
-    ((identifier accessor: identifier)
+    ((id accessor: id)
      (size accessor: size)
      (data accessor: data)))
 
-  ;; A file is usually stored in multiple blocks on tape. A single block is
-  ;; represented by this block class.
+  (define (parse-chunks bitstr #!optional (chunks '()))
+    (bitmatch bitstr
+      (((Id 16 little unsigned)
+        (Size 32 little unsigned)
+        (Data (* 8 Size) bitstring)
+        (Remaining bitstr))
+       (let ((chunk (make <chunk>)))
+        (set! (id chunk) Id)
+        (set! (size chunk) Size)
+        (set! (data chunk) Data)
+        (parse-chunks Remaining (cons chunk chunks))))
+      (else (reverse chunks))))
+
+  (define (block? chunk)
+    (and
+      (or (= (id chunk) #x0100)
+          (= (id chunk) #x0102))
+      (not (zero? (size chunk)))
+      (let ((first-byte (string-ref (bitstring->string (data chunk) 8) 0)))
+        (eq? #\* first-byte))))
+
   (define-class <block> ()
     ((filename accessor: filename)
      (load-addr accessor: load-addr)
      (exec-addr accessor: exec-addr)
      (number accessor: number)
      (size accessor: size)
-     (flag accessor: flag)
+     (last? accessor: last?)
+     (locked? accessor: locked?)
      (header-crc accessor: header-crc)
      (data accessor: data)
      (data-crc accessor: data-crc)))
 
-  ;; The filename in a block is of variable length and null-terminated. It
-  ;; starts at index 1, right after the synchronisation byte, and is up to
-  ;; ten characters in length. This function returns its length.
-  (define (filename-length data #!optional (index 1))
-    (cond
-      ((= index (min 11 (string-length data))) (- index 1))
-      ((eq? #\null (string-ref data index)) (- index 1))
-      (else (filename-length data (+ index 1)))))
-  
-  ;; Reads the version number from a UEF archive.
-  (define (read-version port)
-    (bitmatch (read-string 2 port)
-      (((minor 8 unsigned) (major 8 unsigned)) (cons major minor))))
-  
-  ;; Reads the next <chunk> from a UEF archive. Possibly returns #!eof.
-  (define (read-chunk port)
-    (if (eq? #!eof (peek-char port))
-      #!eof
-      (bitmatch (read-string 6 port)
-        (((Identifier 16 little unsigned)
-          (Size 32 little unsigned))
-          (let ((chunk (make <chunk>)))
-            (set! (identifier chunk) Identifier)
-            (set! (size chunk) Size)
-            (set! (data chunk) (read-string Size port))
-            chunk)))))
+  (define (find-null bitstr #!optional (index 0))
+    (bitmatch bitstr
+      (((#x00) (_ bitstring)) index)
+      (((_ 8) (Remaining bitstring)) (find-null Remaining (+ index 1)))))
 
-  ;; Parses a single tape block and returns a <block>. See the specification:
-  ;; https://beebwiki.mdfs.net/Acorn_cassette_format#BBC_Micro.2C_Electron_and_Master
-  (define (parse-block chunk-data)
-    (let ((n (filename-length chunk-data)))
-      (bitmatch chunk-data
-        (((#x2A)
-          (Filename (* 8 n) bitstring)
+  (define (parse-block bitstr)
+    (let ((filename-length (- (find-null bitstr 1) 1)))
+      (bitmatch bitstr
+        (((#\*)
+          (Filename (* 8 filename-length) bitstring)
           (#x00)
           (LoadAddr 32 little unsigned)
           (ExecAddr 32 little unsigned)
           (Number 16 little unsigned)
           (Size 16 little unsigned)
-          (Flag 8 unsigned)
+          (Last? 1) (_ 6) (Locked? 1)
           (AddressNextFile 32 little unsigned)
           (HeaderCrc 16 little unsigned)
           (DataAndCrc bitstring))
@@ -87,75 +104,41 @@
           (set! (exec-addr block) ExecAddr)
           (set! (number block) Number)
           (set! (size block) Size)
-          (set! (flag block) Flag)
+          (set! (last? block) Last?)
+          (set! (locked? block) Locked?)
           (set! (header-crc block) HeaderCrc)
-          (if (zero? (size block))
-            (begin
-              (set! (data block) "")
-              (set! (data-crc block) 0))
+          (when (not (zero? Size))
             (bitmatch DataAndCrc
-              (((Data (* 8 (size block)) bitstring)
+              (((Data (* 8 Size) bitstring)
                 (DataCrc 16 little unsigned))
                (begin
-                (set! (data block) (bitstring->string Data))
+                (set! (data block) Data)
                 (set! (data-crc block) DataCrc)))))
           block)))))
 
-  ;; Assembles a single file from sequential chunks. The chunk argument is
-  ;; the first chunk of the file. No checks are performed whether subsequent
-  ;; chunks are in the right order or even of the same file.
-  (define (assemble-file-chunks chunk port)
-    (let ((file (make <file>)))
-      (define (assemble-blocks block)
-        (unless (zero? (size block))
-          (append-data! (data block) file))
-        (if (bit->boolean (flag block) 7)
-          file
-          (assemble-blocks (parse-block (data (read-next-file-chunk port))))))
-      (let ((block (parse-block (data chunk))))
-        (set-attribute! 'filename (filename block) file)
-        (set-attribute! 'load-addr (load-addr block) file)
-        (set-attribute! 'exec-addr (exec-addr block) file)
-        (set-attribute! 'locked? (bit->boolean (flag block) 0) file)
-        (assemble-blocks block))))
-
-  ;; Returns whether a chunk represents a file block.
-  (define (file-chunk? chunk)
-    (and
-      (or (= #x0100 (identifier chunk))
-          (= #x0102 (identifier chunk)))
-      (eq? #\* (string-ref (data chunk) 0))))
-
-  ;; Locates and returns the next file chunk in the UEF archive, skipping
-  ;; any non-file chunks. Possibly returns #!eof.
-  (define (read-next-file-chunk port)
-    (let ((chunk (read-chunk port)))
-      (cond
-        ((eq? #!eof chunk) #!eof)
-        ((file-chunk? chunk) chunk)
-        (else (read-next-file-chunk port)))))
-
-  ;; Reads the next file from a UEF archive. Possibly returns #!eof.
-  (define (read-file port)
-    (let ((chunk (read-next-file-chunk port)))
-      (if (eq? #!eof chunk)
-        #!eof
-        (assemble-file-chunks chunk port))))
-
-  ;; Reads all files from a UEF archive.
-  (define (read-files port)
-    (reverse (port-fold cons '() (lambda () (read-file port)))))
-
-  (define-method (open-port (port #t) (archive <uef>))
-    (and
-      (string=? "UEF File!" (read-string 9 port))
-      (= 0 (read-byte port))
-      (set! (version archive) (read-version port))
-      (set! (files archive) (read-files port))))
-
-  (define-method (open-file (filepath #t) (archive <uef>))
-    (and
-      (string-ci=? "uef" (pathname-extension filepath))
-      (call-with-input-file filepath
-        (lambda (port) (open-port port archive))
-        #:binary))))
+  (define (blocks->files blocks #!optional (files '()) (file #f) (expected-nr 0))
+    (if (null? blocks)
+      (reverse files)
+      (let ((block (car blocks))
+            (remaining (cdr blocks)))
+        (cond
+          ; finished any previous file, and start of a new file?
+          ((and (not file) (= (number block) 0))
+            (let ((file (make <file>)))
+              (set-meta! file 'filename  (filename block))
+              (set-meta! file 'load-addr (load-addr block))
+              (set-meta! file 'exec-addr (exec-addr block))
+              (set-meta! file 'locked?   (= (locked? block) 1))
+              (set! (contents file) (data block))
+              (if (last? block)
+                (blocks->files remaining (cons file files))
+                (blocks->files remaining files file 1))))
+          ; completing a file, and expected next block number?
+          ((and file (= (number block) expected-nr))
+           (set! (contents file) (bitstring-append (contents file) (data block)))
+           (if (last? block)
+            (blocks->files remaining (cons file files))
+            (blocks->files remaining files file (+ expected-nr 1))))
+          ; neither, skip this block
+          (else
+            (blocks->files remaining files file expected-nr)))))))
