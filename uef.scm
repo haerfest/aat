@@ -102,8 +102,8 @@
           (set! (exec-addr block) ExecAddr)
           (set! (number block) Number)
           (set! (size block) Size)
-          (set! (last? block) Last?)
-          (set! (locked? block) Locked?)
+          (set! (last? block) (= Last? 1))
+          (set! (locked? block) (= Locked? 1))
           (set! (header-crc block) HeaderCrc)
           (if (zero? Size)
             (begin
@@ -120,7 +120,7 @@
   (define (blocks->files blocks #!optional (files '()) (file #f) (expected-nr 0))
     (if (null? blocks)
       (reverse files)
-      (let ((block (car blocks))
+      (let ((block     (car blocks))
             (remaining (cdr blocks)))
         (cond
           ; finished any previous file, and start of a new file?
@@ -129,16 +129,22 @@
               (set-meta! file 'filename  (filename block))
               (set-meta! file 'load-addr (load-addr block))
               (set-meta! file 'exec-addr (exec-addr block))
-              (set-meta! file 'locked?   (= (locked? block) 1))
+              (set-meta! file 'locked?   (locked? block))
               (set! (contents file) (data block))
               (if (last? block)
-                (blocks->files remaining (cons file files))
+                (begin
+                  (set-meta! file 'size (/ (bitstring-length (contents file)) 8))
+                  (blocks->files remaining (cons file files)))
                 (blocks->files remaining files file 1))))
-          ; completing a file, and expected next block number?
-          ((and file (= (number block) expected-nr))
+          ; continuing a file, and expected next block number?
+          ((and file
+                (string=? (filename block) (get-meta file 'filename))
+                (= (number block) expected-nr))
            (set! (contents file) (bitstring-append (contents file) (data block)))
            (if (last? block)
-            (blocks->files remaining (cons file files))
+            (begin
+              (set-meta! file 'size (/ (bitstring-length (contents file)) 8))
+              (blocks->files remaining (cons file files)))
             (blocks->files remaining files file (+ expected-nr 1))))
           ; neither, skip this block
           (else
