@@ -1,40 +1,30 @@
+;; -----------------------------------------------------------------------------
+;; Represents a file. Each archive is a file itself.
+;; -----------------------------------------------------------------------------
+
 (module (aat file)
-  (<file> data fmt attribute attributes append-data! set-attribute!)
+  (<file> contents meta get-meta set-meta!)
 
   (import
-    (chicken base)
-    (chicken format)
-    (chicken io)
-    (chicken pathname)
     coops
+    coops-primitive-objects
     scheme)
 
-  (define-generic (data uef))
-  
+  (define-generic (contents archive))
+
+  (define-generic (meta archive))
+
   (define-class <file> ()
-    ((data initform: "" accessor: data)
-     (attributes initform: '() accessor: attributes)))
+    ((contents initform: (lambda () "") accessor: contents)
+     (meta initform: '() accessor: meta)))
 
-  (define-method (fmt (file <file>))
-    (apply string-append
-      (map
-        (lambda (attr)
-          (let ((value (cdr attr)))
-            (if (fixnum? value)
-              (format #f " ~S:#x~X" (car attr) value)
-              (format #f " ~S:~A" (car attr) value))))
-        (reverse (attributes file)))))
-  
-  (define-method (append-data! (new-data #t) (file <file>))
-    (set! (data file) (string-append (data file) new-data))
-    (set-attribute! 'size (string-length (data file)) file))
-  
-  (define-method (attribute (attr #t) (file <file>))
-    (assq attr (attributes file)))
+  (define-method (get-meta (file <file>) (key <symbol>))
+    (let ((existing (assq key (meta file))))
+      (and existing (cdr existing))))
 
-  (define-method (set-attribute! (attr #t) (value #t) (file <file>))
-    (let ((existing (assq attr (attributes file))))
-      (if (not existing)
-        (set! (attributes file)
-              (cons (cons attr value) (attributes file)))
-        (set! (cdr existing) value)))))
+  (define-method (set-meta! (file <file>) (key <symbol>) (value #t))
+    (let ((existing (assq key (meta file))))
+      (if existing
+        (set! (cdr existing) value)
+        (set! (meta file)
+          (cons (cons key value) (meta file)))))))

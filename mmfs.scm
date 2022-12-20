@@ -31,6 +31,11 @@
 
 ;; -----------------------------------------------------------------------------
 
+  (define +status-readonly+    #x00)
+  (define +status-readwrite+   #x0F)
+  (define +status-unformatted+ #xF0)
+  (define +status-invalid+     #xFF)
+
   (define (null-terminated-bitstring->string bstr)
     (list->string
       (map
@@ -47,8 +52,12 @@
           (Status 8)
           (Remaining bitstring))
          (begin
-          (when (or (= Status #x00) (= Status #x0F))
-            (vector-set! (disks archive) disk-number (cons disk-number (null-terminated-bitstring->string DiskName))))
+          (when (or (= Status +status-readonly+)
+                    (= Status +status-readwrite+))
+            (vector-set!
+              (disks archive)
+              disk-number
+              (cons disk-number (null-terminated-bitstring->string DiskName))))
           (parse-catalog Remaining archive (+ disk-number 1)))))))
 
   (define (parse-content header archive)
