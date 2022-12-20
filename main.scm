@@ -23,7 +23,10 @@
         (read-port tape (current-input-port))
         (for-each
           (lambda (file)
-            (format #t "~A~%" (get-meta file 'filename)))
+            (format #t "~A ~X ~X~%"
+              (get-meta file 'filename)
+              (get-meta file 'load-addr)
+              (get-meta file 'exec-addr)))
           ((members tape)))))))
 
 ;; =============================================================================

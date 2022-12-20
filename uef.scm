@@ -14,6 +14,7 @@
     (aat file)
     bitstring
     (chicken base)
+    (chicken format)
     (chicken io)
     coops
     scheme
@@ -38,8 +39,9 @@
         (set-meta! tape 'version (cons VersionMajor VersionMinor))
         (set!
           (members tape)
-          (blocks->files
-            (map parse-block (filter block? (parse-chunks Remaining)))))))))
+          (lambda ()
+            (blocks->files
+              (map parse-block (filter block? (parse-chunks Remaining))))))))))
 
   (define-class <chunk> ()
     ((id accessor: id)
@@ -51,7 +53,7 @@
       (((Id 16 little unsigned)
         (Size 32 little unsigned)
         (Data (* 8 Size) bitstring)
-        (Remaining bitstr))
+        (Remaining bitstring))
        (let ((chunk (make <chunk>)))
         (set! (id chunk) Id)
         (set! (size chunk) Size)
@@ -64,7 +66,7 @@
       (or (= (id chunk) #x0100)
           (= (id chunk) #x0102))
       (not (zero? (size chunk)))
-      (let ((first-byte (string-ref (bitstring->string (data chunk) 8) 0)))
+      (let ((first-byte (string-ref (bitstring->string (data chunk)) 0)))
         (eq? #\* first-byte))))
 
   (define-class <block> ()
@@ -79,16 +81,12 @@
      (data accessor: data)
      (data-crc accessor: data-crc)))
 
-  (define (find-null bitstr #!optional (index 0))
-    (bitmatch bitstr
-      (((#x00) (_ bitstring)) index)
-      (((_ 8) (Remaining bitstring)) (find-null Remaining (+ index 1)))))
-
-  (define (parse-block bitstr)
-    (let ((filename-length (- (find-null bitstr 1) 1)))
+  (define (parse-block chunk)
+    (let* ((bitstr (data chunk))
+           (n (- (list-index zero? (take (bitstring->list bitstr 8) 12)) 1)))
       (bitmatch bitstr
         (((#\*)
-          (Filename (* 8 filename-length) bitstring)
+          (Filename (* 8 n) bitstring)
           (#x00)
           (LoadAddr 32 little unsigned)
           (ExecAddr 32 little unsigned)
@@ -107,7 +105,10 @@
           (set! (last? block) Last?)
           (set! (locked? block) Locked?)
           (set! (header-crc block) HeaderCrc)
-          (when (not (zero? Size))
+          (if (zero? Size)
+            (begin
+              (set! (data block) (string->bitstring ""))
+              (set! (data-crc block) 0))
             (bitmatch DataAndCrc
               (((Data (* 8 Size) bitstring)
                 (DataCrc 16 little unsigned))
