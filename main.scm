@@ -8,28 +8,27 @@
 (load "file")
 (load "archive")
 (load "dfs")
+(load "mmfs")
 (load "uef")
 
 (import (aat file))
 (import (aat dfs))
+(import (aat mmfs))
 (import (aat uef))
 
 ;; =============================================================================
 
 (define (main)
-  (with-input-from-file "media/Elite_E.uef"
+  (with-input-from-file "media/BEEB.MMB"
     (lambda ()
-      (let ((tape (make <uef>)))
-        (read-port tape (current-input-port))
+      (let ((mmb (make <mmfs>)))
+        (read-port mmb (current-input-port))
         (for-each
           (lambda (file)
-            (format #t "~A #x~X #x~X #x~X(~A)~%"
-              (get-meta file 'filename)
-              (get-meta file 'load-addr)
-              (get-meta file 'exec-addr)
-              (get-meta file 'size)
-              (get-meta file 'size)))
-          ((members tape)))))))
+            (format #t "~A: ~A~%"
+              (get-meta file 'slot)
+              (get-meta file 'discname)))
+          ((members mmb)))))))
 
 ;; =============================================================================
 

@@ -15,7 +15,7 @@
   (define-generic (meta archive))
 
   (define-class <file> ()
-    ((contents initform: (lambda () "") accessor: contents)
+    ((contents initform: "" accessor: contents)
      (meta initform: '() accessor: meta)))
 
   (define-method (get-meta (file <file>) (key <symbol>))

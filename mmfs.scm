@@ -11,23 +11,25 @@
 
   (import
     (aat archive)
+    (aat file)
+    (aat dfs)
     bitstring
     (chicken base)
     (chicken io)
     coops
     scheme
     srfi-1)
-  
-  (define-generic (disks archive))
 
   (define-class <mmfs> (<archive>)
-    ((disks initform: (make-vector 511 #f) accessor: disks)))
+    ((discs initform: (make-vector 511 #f) accessor: discs)))
 
   (define-method (read-port (archive <mmfs>) (port #t))
-    (parse-content (read-string (* 100 1024 1024) port) archive))
+    (set! (contents archive) (read-string (* 100 1024 1024) port))
+    (parse-contents archive))
 
   (define-method (members (archive <mmfs>))
-    (filter (lambda (disk) disk) (vector->list (disks archive))))
+    (lambda ()
+      (filter (lambda (disc) disc) (vector->list (discs archive)))))
 
 ;; -----------------------------------------------------------------------------
 
@@ -36,33 +38,35 @@
   (define +status-unformatted+ #xF0)
   (define +status-invalid+     #xFF)
 
-  (define (null-terminated-bitstring->string bstr)
-    (list->string
-      (map
-        (lambda (ascii) (integer->char ascii))
-        (take-while
-          (lambda (ascii) (not (zero? ascii)))
-          (bitstring->list bstr 8)))))
+  (define-method (parse-contents (archive <mmfs>))
+    (bitmatch (contents archive)
+      (((#x00) (#x01) (#x02) (#x03) (#x00) (#x00) (#x00) (#x00)
+        (#x00) (#x00) (#x00) (#x00) (#x00) (#x00) (#x00) (#x00)
+        (Catalog (* 8 (- 8192 16)) bitstring)
+        (Discs bitstring))
+       (parse-catalog Catalog archive))))
 
-  (define (parse-catalog catalog archive #!optional (disk-number 0))
-    (when (< disk-number 511)
-      (bitmatch catalog
-        (((DiskName (* 12 8) bitstring)
+  (define (->discname bitstr)
+    (let* ((ascii-codes (bitstring->list bitstr 8))
+           (count       (list-index zero? ascii-codes)))
+      (list->string (map integer->char (take ascii-codes count)))))
+
+  (define (parse-catalog bitstr archive #!optional (slot 0))
+    (when (< slot 511)
+      (bitmatch bitstr
+        (((DiscName (* 12 8) bitstring)
           (#x00) (#x00) (#x00)
           (Status 8)
+          (check (or (= Status +status-readonly+)
+                     (= Status +status-readwrite+)
+                     (= Status +status-unformatted+)
+                     (= Status +status-invalid+)))
           (Remaining bitstring))
          (begin
           (when (or (= Status +status-readonly+)
                     (= Status +status-readwrite+))
-            (vector-set!
-              (disks archive)
-              disk-number
-              (cons disk-number (null-terminated-bitstring->string DiskName))))
-          (parse-catalog Remaining archive (+ disk-number 1)))))))
-
-  (define (parse-content header archive)
-    (bitmatch header
-      (((#x00) (#x01) (#x02) (#x03) (#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)(#x00)
-        (Catalog (* 8 (- 8192 16)) bitstring)
-        (Disks bitstring))
-       (parse-catalog Catalog archive)))))
+            (let ((disc (make <dfs>)))
+              (set-meta! disc 'slot slot)
+              (set-meta! disc 'discname (->discname DiscName))
+              (vector-set! (discs archive) slot disc)))
+          (parse-catalog Remaining archive (+ slot 1))))))))
