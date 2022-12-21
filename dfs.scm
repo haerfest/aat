@@ -1,5 +1,5 @@
 ;; -----------------------------------------------------------------------------
-;; Represents a DFS (Disc Filing System) archive.
+;; Represents a DFS (Disc Filing System) disc.
 ;;
 ;; See:
 ;; - https://beebwiki.mdfs.net/Acorn_DFS_disc_format
@@ -7,95 +7,137 @@
 ;; -----------------------------------------------------------------------------
 
 (module (aat dfs)
-  (<dfs> members read-port)
+  (<dfs>
+   mount unmount members
+   title write-cycle-count opt-4 sector-count)
 
   (import
-    (aat archive)
     (aat file)
+    (aat fs)
     bitstring
     (chicken base)
-    (chicken bitwise)
+    (chicken format)
     (chicken io)
     coops
-    list-comprehensions
-    scheme)
+    coops-primitive-objects
+    matchable
+    scheme
+    srfi-1)
 
-  (define-class <dfs> (<archive>))
+  (define-class <dfs> (<fs>)
+    ((title initform: "" accessor: title)
+     (write-cycle-count initform: 0 accessor: write-cycle-count)
+     (opt-4 initform: 0 accessor: opt-4)
+     (sector-count initform: 0 accessor: sector-count)))
 
-  (define-method (read-port (disc <dfs>) (port #t))
-    (set! (contents disc) (read-string #f port))
-    (parse-contents disc))
+  (define-method (mount (disc <dfs>) (port <port>))
+    (parse disc (read-string #f port)))
+
+  (define-method (unmount (disc <dfs>))
+    #f)
 
 ;; -----------------------------------------------------------------------------
 
-  (define (parse-filenames-and-dirs bitstr files)
-    (when (not (null? files))
-      (let ((file (car files)))
-        (bitmatch bitstr
-          (((Filename (* 8 7) bitstring)
-            (Locked? 1)
-            (Directory 7)
-            (Remainder bitstring))
-          (begin
-            (set-meta! file 'filename (bitstring->string Filename))
-            (set-meta! file 'directory (integer->char Directory))
-            (set-meta! file 'locked? (= 1 Locked?))
-            (parse-filenames-and-dirs Remainder (cdr files))))))))
+  (define (read-contents bitstr start-sector size)
+    (bitmatch bitstr
+      (((_ (* 8 256 start-sector) bitstring)
+        (Contents (* 8 size) bitstring)
+        (_ bitstring))
+       Contents)))
 
-  (define (parse-files-attributes bitstr files)
-    (if (not (null? files))
-      (let ((file (car files)))
-        (bitmatch bitstr
-          (((LoadAddr 16 little unsigned)
-            (ExecAddr 16 little unsigned)
-            (Size 16 little unsigned)
-            (ExecAddrHigh 2)
-            (SizeHigh 2)
-            (LoadAddrHigh 2)
-            (StartSector 10 big unsigned)
-            (Remainder bitstring))
-          (begin
-            (set-meta! file 'load-addr (+ (* 65536 LoadAddrHigh) LoadAddr))
-            (set-meta! file 'exec-addr (+ (* 65536 ExecAddrHigh) ExecAddr))
-            (set-meta! file 'size (+ (* 65536 SizeHigh) Size))
-            (set-meta! file 'start-sector StartSector)
-            (parse-files-attributes Remainder (cdr files))))))))
+  (define (make-file args bitstr)
+    (match args
+      (((fn locked?) (ld-addr ex-addr sz start-sector))
+        (let ((file (make <file>)))
+          (set! (filename  file) fn)
+          (set! (readable? file) (not locked?))
+          (set! (writable? file) (not locked?))
+          (set! (load-addr file) ld-addr)
+          (set! (exec-addr file) ex-addr)
+          (set! (size      file) sz)
+          (set! (contents  file) (read-contents bitstr start-sector sz))
+          (set-meta! file 'dfs.start-sector start-sector)
+          file))))
 
-  (define-method (parse-contents (disc <dfs>))
-    (bitmatch (contents disc)
+  (define +max-file-count+ 31)
+
+  (define (null-terminated str)
+    (let* ((chars (string->list str))
+           (index (list-index (lambda (char) (eq? char #\null)) chars)))
+      (if (not index)
+        str
+        (list->string (take chars index)))))
+
+  (define (parse-filenames bitstr file-count #!optional (acc '()))
+    (if (zero? file-count)
+      (reverse acc)
+      (bitmatch bitstr
+        (((Filename (* 8 7) bitstring)
+          (Locked? 1)
+          (Directory 7)
+          (Remainder bitstring))
+         (parse-filenames
+          Remainder
+          (- file-count 1)
+          (cons
+            (list
+              (format #f "~C.~A"
+                (integer->char Directory)
+                (null-terminated (bitstring->string Filename)))
+              (= 1 Locked?))
+            acc))))))
+
+  (define (parse-attributes bitstr file-count #!optional (acc '()))
+    (if (zero? file-count)
+      (reverse acc)
+      (bitmatch bitstr
+        (((LoadAddr 16 little unsigned)
+          (ExecAddr 16 little unsigned)
+          (Size 16 little unsigned)
+          (ExecAddrHigh 2)
+          (SizeHigh 2)
+          (LoadAddrHigh 2)
+          (StartSector 10 big unsigned)
+          (Remainder bitstring))
+         (parse-attributes
+          Remainder
+          (- file-count 1)
+          (cons
+            (list
+              (+ (* 65536 LoadAddrHigh) LoadAddr)
+              (+ (* 65536 ExecAddrHigh) ExecAddr)
+              (+ (* 65536 SizeHigh)     Size)
+              StartSector)
+            acc))))))
+
+  (define (parse disc bitstr)
+    (bitmatch bitstr
       ((
         ; first sector of 256 bytes
         (DiskTitleFirst8 (* 8 8) bitstring)
-        (FilenamesAndDirs (* 31 8 (+ 7 1)) bitstring)
+        (FilenamesAndDirs (* +max-file-count+ 8 (+ 7 1)) bitstring)
         ; second sector of 256 bytes
         (DiskTitleLast4 (* 4 8) bitstring)
         (WriteCycleCount 8 unsigned)
         (FileCountTimes8 8 unsigned)
         (_ 2) (Opt4 2) (_ 2)
         (SectorCount 10 big unsigned)
-        (FilesAttributes (* 31 8 8) bitstring)
+        (FilesAttributes (* +max-file-count+ 8 8) bitstring)
         ; remaining sectors
         (_ bitstring))
        (begin
-        (set-meta! disc 'title
-          (string-append
-            (bitstring->string DiskTitleFirst8)
-            (bitstring->string DiskTitleLast4)))
-        (set-meta! disc 'write-cycle-count WriteCycleCount)
-        (set-meta! disc 'opt-4 Opt4)
-        (set-meta! disc 'sector-count SectorCount)
-        (let ((files (map (lambda (_) (make <file>))
-                          (range (/ FileCountTimes8 8)))))
-            (parse-filenames-and-dirs FilenamesAndDirs files)
-            (parse-files-attributes FilesAttributes files)
-            ; the contents of each file are retrieved on-demand
-            (for-each
-              (lambda (file)
-                (set!
-                  (contents file)
-                  (lambda ()
-                    (let ((offset (* 256 (get-meta file 'start-sector)))
-                          (size   (get-meta file 'size)))
-                      (substring (contents disc) offset (+ offset size))))))
-              files)
-            (set! (members disc) (lambda () files))))))))
+        (set! (title disc)
+              (null-terminated
+                (string-append (bitstring->string DiskTitleFirst8)
+                (bitstring->string DiskTitleLast4))))
+        (set! (write-cycle-count disc) WriteCycleCount)
+        (set! (opt-4 disc) Opt4)
+        (set! (sector-count disc) SectorCount)
+        (let* ((file-count (/ FileCountTimes8 8))
+               (filenames  (parse-filenames FilenamesAndDirs file-count))
+               (attributes (parse-attributes FilesAttributes file-count)))
+          (set! (members disc)
+            (map
+              (lambda (args)
+                (make-file args bitstr))
+              (zip filenames attributes)))))))))

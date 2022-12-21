@@ -6,29 +6,37 @@
 
 ;; Modules.
 (load "file")
-(load "archive")
+(load "fs")
 (load "dfs")
-(load "mmfs")
-(load "uef")
 
 (import (aat file))
+(import (aat fs))
 (import (aat dfs))
-(import (aat mmfs))
-(import (aat uef))
 
 ;; =============================================================================
 
 (define (main)
-  (with-input-from-file "media/BEEB.MMB"
+  (with-input-from-file "media/Elite.ssd"
     (lambda ()
-      (let ((mmb (make <mmfs>)))
-        (read-port mmb (current-input-port))
+      (let ((disc (make <dfs>)))
+        (mount disc (current-input-port))
+        (format #t "~S (~A)  *OPT4,~A  ~A sectors~%"
+          (title disc)
+          (write-cycle-count disc)
+          (opt-4 disc)
+          (sector-count disc))
         (for-each
           (lambda (file)
-            (format #t "~A: ~A~%"
-              (get-meta file 'slot)
-              (get-meta file 'discname)))
-          ((members mmb)))))))
+            (format #t "~A\t&~X\t&~X\t~A\t~C~C~%"
+              (filename file)
+              (load-addr file)
+              (exec-addr file)
+              (size file)
+              (if (readable? file) #\R #\space)
+              (if (writable? file) #\W #\space)
+              ))
+          (members disc))
+        (unmount disc)))))
 
 ;; =============================================================================
 
