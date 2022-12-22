@@ -3,6 +3,7 @@
 ;;
 ;; See:
 ;; - https://beebwiki.mdfs.net/Acorn_DFS_disc_format
+;; - https://mdfs.net/Docs/Comp/Disk/Format/DFS
 ;; - https://sweh.spuddy.org/Beeb/mmb_utils.html
 ;; -----------------------------------------------------------------------------
 
@@ -22,7 +23,8 @@
     coops-primitive-objects
     matchable
     scheme
-    srfi-1)
+    srfi-1
+    srfi-13)
 
   (define-class <dfs> (<fs>)
     ((title initform: "" accessor: title)
@@ -61,13 +63,6 @@
 
   (define +max-file-count+ 31)
 
-  (define (null-terminated str)
-    (let* ((chars (string->list str))
-           (index (list-index (lambda (char) (eq? char #\null)) chars)))
-      (if (not index)
-        str
-        (list->string (take chars index)))))
-
   (define (parse-filenames bitstr file-count #!optional (acc '()))
     (if (zero? file-count)
       (reverse acc)
@@ -83,7 +78,7 @@
             (list
               (format #f "~C.~A"
                 (integer->char Directory)
-                (null-terminated (bitstring->string Filename)))
+                (string-trim-right (bitstring->string Filename)))
               (= 1 Locked?))
             acc))))))
 
@@ -127,9 +122,9 @@
         (_ bitstring))
        (begin
         (set! (title disc)
-              (null-terminated
+              (string-trim-right
                 (string-append (bitstring->string DiskTitleFirst8)
-                (bitstring->string DiskTitleLast4))))
+                               (bitstring->string DiskTitleLast4))))
         (set! (write-cycle-count disc) WriteCycleCount)
         (set! (opt-4 disc) Opt4)
         (set! (sector-count disc) SectorCount)
