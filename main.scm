@@ -35,34 +35,28 @@
 
 (define (print-dfs disc)
   (mount disc)
-  (format #t "~S (~A)\t*OPT4,~A\t~A sectors\t~S~%"
+  (format #t "~S (~A)  *OPT4,~A  ~A sectors  ~S~%"
     (title             disc)
     (write-cycle-count disc)
     (opt-4             disc)
     (sector-count      disc)
     (id                disc))
+  (for-each print-file (items disc))
   (unmount disc))
 
 (define (test-dfs filepath)
   (call-with-input-file filepath
     (lambda (port)
-      (let ((fs (make <dfs> 'source port)))
-        (mount fs)
-        (format #t "~S (~A)  *OPT4,~A  ~A sectors~%"
-          (title             fs)
-          (write-cycle-count fs)
-          (opt-4             fs)
-          (sector-count      fs))
-        (for-each print-file (items fs))
-        (unmount fs)))))
+      (let ((disc (make <dfs> 'source port)))
+        (print-dfs disc)))))
 
 (define (test-uef filepath)
   (call-with-input-file filepath
     (lambda (port)
-      (let ((fs (make <uef> 'source port)))
-        (mount fs)
-        (for-each print-file (items fs))
-        (unmount fs)))))
+      (let ((tape (make <uef> 'source port)))
+        (mount tape)
+        (for-each print-file (items tape))
+        (unmount tape)))))
 
 (define (test-mmfs filepath)
   (call-with-input-file filepath
