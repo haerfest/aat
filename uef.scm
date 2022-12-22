@@ -116,7 +116,7 @@
           (ContentsAndCrc  bitstring))
          (let ((block (make <block>)))
           (set! (filename   block) (string-trim-right
-                                    (bitstring->string Filename)))
+                                    (bitstring->string Filename) #\space))
           (set! (load-addr  block) LoadAddr)
           (set! (exec-addr  block) ExecAddr)
           (set! (number     block) Number)

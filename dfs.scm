@@ -77,7 +77,7 @@
             (list
               (format #f "~C.~A"
                 (integer->char Directory)
-                (string-trim-right (bitstring->string Filename)))
+                (string-trim-right (bitstring->string Filename) #\space))
               (= 1 Locked?))
             acc))))))
 

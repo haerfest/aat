@@ -1,6 +1,8 @@
 (import
   (chicken format)
-  coops)
+  coops
+  srfi-13
+  srfi-14)
 
 ;; =============================================================================
 
@@ -17,9 +19,14 @@
 
 ;; -----------------------------------------------------------------------------
 
+(define (char-normalise char)
+  (if (char-set-contains? char-set:iso-control char)
+    #\?
+    char))
+
 (define (print-file file)
   (format #t "~A\t&~X\t&~X\t~A\t~C~%"
-    (filename  file)
+    (string-map char-normalise (filename file))
     (load-addr file)
     (exec-addr file)
     (size      file)
