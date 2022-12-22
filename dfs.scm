@@ -38,7 +38,9 @@
       ((input-port? (source disc))
         (parse disc (read-string #f (source disc))))
       ((bitstring? (source disc))
-        (parse disc (source disc)))))
+        (parse disc (source disc)))
+      (else
+        (error '???'))))
 
   (define-method (unmount (disc <dfs>))
     #f)
@@ -128,7 +130,9 @@
         (set! (title disc)
               (string-trim-right
                 (string-append (bitstring->string DiskTitleFirst8)
-                               (bitstring->string DiskTitleLast4))))
+                               (bitstring->string DiskTitleLast4))
+                (lambda (char) (or (eq? char #\space)
+                                                      (eq? char #\null)))))
         (set! (write-cycle-count disc) WriteCycleCount)
         (set! (opt-4 disc) Opt4)
         (set! (sector-count disc) SectorCount)

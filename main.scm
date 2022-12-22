@@ -34,12 +34,14 @@
     (id        file)))
 
 (define (print-dfs disc)
+  (mount disc)
   (format #t "~S (~A)\t*OPT4,~A\t~A sectors\t~S~%"
     (title             disc)
     (write-cycle-count disc)
     (opt-4             disc)
     (sector-count      disc)
-    (id                disc)))
+    (id                disc))
+  (unmount disc))
 
 (define (test-dfs filepath)
   (call-with-input-file filepath

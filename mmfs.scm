@@ -89,7 +89,8 @@
          (bitmatch discs-bitstr
           (((Contents       (* 8 200 1024) bitstring)
             (RemainingDiscs bitstring))
-           (when (not (= Status +status-invalid+))
+           (when (or (= Status +status-readonly+))
+                     (= Status +status-readwrite+)
             (let ((disc (make <dfs> 'source Contents)))
               (set! (id disc) (format #f "~A.~A" slot (->discname DiscName)))
               (vector-set! (discs archive) slot disc)))
