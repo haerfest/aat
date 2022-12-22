@@ -4,7 +4,7 @@
 
 (module (aat file)
   (<file>
-   filename load-addr exec-addr size readable? writable? contents
+   filename load-addr exec-addr size locked? contents
    meta get-meta set-meta!)
 
   (import
@@ -17,8 +17,7 @@
      (load-addr initform: 0   accessor: load-addr)
      (exec-addr initform: 0   accessor: exec-addr)
      (size      initform: 0   accessor: size)
-     (readable? initform: #t  accessor: readable?)
-     (writable? initform: #t  accessor: writable?)
+     (locked?   initform: #f  accessor: locked?)
      (contents  initform: ""  accessor: contents)
      (meta      initform: '() accessor: meta)))
 

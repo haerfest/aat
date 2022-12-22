@@ -21,20 +21,18 @@
       (let ((disc (make <dfs>)))
         (mount disc (current-input-port))
         (format #t "~S (~A)  *OPT4,~A  ~A sectors~%"
-          (title disc)
+          (title             disc)
           (write-cycle-count disc)
-          (opt-4 disc)
-          (sector-count disc))
+          (opt-4             disc)
+          (sector-count      disc))
         (for-each
           (lambda (file)
-            (format #t "~A\t&~X\t&~X\t~A\t~C~C~%"
-              (filename file)
+            (format #t "~A\t&~X\t&~X\t~A\t~C~%"
+              (filename  file)
               (load-addr file)
               (exec-addr file)
-              (size file)
-              (if (readable? file) #\R #\space)
-              (if (writable? file) #\W #\space)
-              ))
+              (size      file)
+              (if (locked? file) #\L #\space)))
           (members disc))
         (unmount disc)))))
 

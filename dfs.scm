@@ -27,10 +27,10 @@
     srfi-13)
 
   (define-class <dfs> (<fs>)
-    ((title initform: "" accessor: title)
-     (write-cycle-count initform: 0 accessor: write-cycle-count)
-     (opt-4 initform: 0 accessor: opt-4)
-     (sector-count initform: 0 accessor: sector-count)))
+    ((title             initform: "" accessor: title)
+     (write-cycle-count initform: 0  accessor: write-cycle-count)
+     (opt-4             initform: 0  accessor: opt-4)
+     (sector-count      initform: 0  accessor: sector-count)))
 
   (define-method (mount (disc <dfs>) (port <port>))
     (parse disc (read-string #f port)))
@@ -40,24 +40,23 @@
 
 ;; -----------------------------------------------------------------------------
 
-  (define (read-contents bitstr start-sector size)
+  (define (read-file bitstr start-sector size)
     (bitmatch bitstr
-      (((_ (* 8 256 start-sector) bitstring)
+      (((_        (* 8 256 start-sector) bitstring)
         (Contents (* 8 size) bitstring)
-        (_ bitstring))
+        (_        bitstring))
        Contents)))
 
   (define (make-file args bitstr)
     (match args
-      (((fn locked?) (ld-addr ex-addr sz start-sector))
+      (((fn lckd?) (ld-addr ex-addr sz start-sector))
         (let ((file (make <file>)))
           (set! (filename  file) fn)
-          (set! (readable? file) (not locked?))
-          (set! (writable? file) (not locked?))
+          (set! (locked?   file) lckd?)
           (set! (load-addr file) ld-addr)
           (set! (exec-addr file) ex-addr)
           (set! (size      file) sz)
-          (set! (contents  file) (read-contents bitstr start-sector sz))
+          (set! (contents  file) (read-file bitstr start-sector sz))
           (set-meta! file 'dfs.start-sector start-sector)
           file))))
 
@@ -67,8 +66,8 @@
     (if (zero? file-count)
       (reverse acc)
       (bitmatch bitstr
-        (((Filename (* 8 7) bitstring)
-          (Locked? 1)
+        (((Filename  (* 8 7) bitstring)
+          (Locked?   1)
           (Directory 7)
           (Remainder bitstring))
          (parse-filenames
@@ -86,14 +85,14 @@
     (if (zero? file-count)
       (reverse acc)
       (bitmatch bitstr
-        (((LoadAddr 16 little unsigned)
-          (ExecAddr 16 little unsigned)
-          (Size 16 little unsigned)
+        (((LoadAddr     16 little unsigned)
+          (ExecAddr     16 little unsigned)
+          (Size         16 little unsigned)
           (ExecAddrHigh 2)
-          (SizeHigh 2)
+          (SizeHigh     2)
           (LoadAddrHigh 2)
-          (StartSector 10 big unsigned)
-          (Remainder bitstring))
+          (StartSector  10 big unsigned)
+          (Remainder    bitstring))
          (parse-attributes
           Remainder
           (- file-count 1)
@@ -109,15 +108,15 @@
     (bitmatch bitstr
       ((
         ; first sector of 256 bytes
-        (DiskTitleFirst8 (* 8 8) bitstring)
+        (DiskTitleFirst8  (* 8 8) bitstring)
         (FilenamesAndDirs (* +max-file-count+ 8 (+ 7 1)) bitstring)
         ; second sector of 256 bytes
-        (DiskTitleLast4 (* 4 8) bitstring)
-        (WriteCycleCount 8 unsigned)
-        (FileCountTimes8 8 unsigned)
+        (DiskTitleLast4   (* 4 8) bitstring)
+        (WriteCycleCount  8 unsigned)
+        (FileCountTimes8  8 unsigned)
         (_ 2) (Opt4 2) (_ 2)
-        (SectorCount 10 big unsigned)
-        (FilesAttributes (* +max-file-count+ 8 8) bitstring)
+        (SectorCount      10 big unsigned)
+        (FilesAttributes  (* +max-file-count+ 8 8) bitstring)
         ; remaining sectors
         (_ bitstring))
        (begin
