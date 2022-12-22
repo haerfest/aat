@@ -9,7 +9,7 @@
 
 (module (aat dfs)
   (<dfs>
-   mount unmount members
+   id mount unmount items
    title write-cycle-count opt-4 sector-count)
 
   (import
@@ -51,13 +51,13 @@
     (match args
       (((fn lckd?) (ld-addr ex-addr sz start-sector))
         (let ((file (make <file>)))
+          (set! (id        file) (cons fn start-sector))
           (set! (filename  file) fn)
           (set! (locked?   file) lckd?)
           (set! (load-addr file) ld-addr)
           (set! (exec-addr file) ex-addr)
           (set! (size      file) sz)
           (set! (contents  file) (read-file bitstr start-sector sz))
-          (set-meta! file 'dfs.start-sector start-sector)
           file))))
 
   (define +max-file-count+ 31)
@@ -130,7 +130,7 @@
         (let* ((file-count (/ FileCountTimes8 8))
                (filenames  (parse-filenames FilenamesAndDirs file-count))
                (attributes (parse-attributes FilesAttributes file-count)))
-          (set! (members disc)
+          (set! (items disc)
             (map
               (lambda (args)
                 (make-file args bitstr))

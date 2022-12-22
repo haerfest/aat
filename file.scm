@@ -4,15 +4,16 @@
 
 (module (aat file)
   (<file>
-   filename load-addr exec-addr size locked? contents
+   id filename load-addr exec-addr size locked? contents
    meta get-meta set-meta!)
 
   (import
+    (aat identifiable)
     coops
     coops-primitive-objects
     scheme)
 
-  (define-class <file> ()
+  (define-class <file> (<identifiable>)
     ((filename  initform: ""  accessor: filename)
      (load-addr initform: 0   accessor: load-addr)
      (exec-addr initform: 0   accessor: exec-addr)

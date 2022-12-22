@@ -3,9 +3,11 @@
 ;; -----------------------------------------------------------------------------
 
 (module (aat fs)
-  (<fs> mount unmount members add remove)
+  (<fs>
+   id mount unmount items add remove)
 
   (import
+    (aat identifiable)
     coops
     scheme)
 
@@ -19,5 +21,5 @@
 
   (define-generic (remove fs))
 
-  (define-class <fs> ()
-    ((members initform: '() accessor: members))))
+  (define-class <fs> (<identifiable>)
+    ((items accessor: items))))

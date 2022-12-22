@@ -7,30 +7,29 @@
 ;; =============================================================================
 
 ;; Modules.
-(load "file")
+(load "identifiable")
 (load "fs")
+(load "file")
 (load "dfs")
 (load "uef")
 
-(import (aat file))
-(import (aat fs))
-(import (aat dfs))
-(import (aat uef))
+(import
+  (aat identifiable)
+  (aat fs)
+  (aat file)
+  (aat dfs)
+  (aat uef))
 
 ;; -----------------------------------------------------------------------------
 
-(define (char-normalise char)
-  (if (char-set-contains? char-set:iso-control char)
-    #\?
-    char))
-
 (define (print-file file)
-  (format #t "~A\t&~X\t&~X\t~A\t~C~%"
-    (string-map char-normalise (filename file))
+  (format #t "~S\t&~X\t&~X\t~A\t~C ~S~%"
+    (filename  file)
     (load-addr file)
     (exec-addr file)
     (size      file)
-    (if (locked? file) #\L #\space)))
+    (if (locked? file) #\L #\space)
+    (id        file)))
 
 (define (test-dfs)
   (call-with-input-file "media/Elite.ssd"
@@ -42,7 +41,7 @@
           (write-cycle-count disc)
           (opt-4             disc)
           (sector-count      disc))
-        (for-each print-file (members disc))
+        (for-each print-file (items disc))
         (unmount disc)))))
 
 (define (test-uef)
@@ -50,7 +49,7 @@
     (lambda (port)
       (let ((tape (make <uef>)))
         (mount tape port)
-        (for-each print-file (members tape))
+        (for-each print-file (items tape))
         (unmount tape)))))
 
 (define (main)

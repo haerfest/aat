@@ -7,7 +7,8 @@
 ;; -----------------------------------------------------------------------------
 
 (module (aat uef)
-  (<uef> mount unmount members)
+  (<uef>
+   id mount unmount items)
 
   (import
     (aat file)
@@ -53,7 +54,7 @@
        (begin
         (set! (version tape) (cons VersionMajor VersionMinor))
         (set!
-          (members tape)
+          (items tape)
           (->> Remaining
             parse-chunks
             (filter block?)
@@ -146,6 +147,7 @@
           ; finished any previous file, and start of a new file?
           ((and (not file) (= (number block) 0))
             (let ((file (make <file>)))
+              (set! (id        file) (cons (length files) (filename block)))
               (set! (filename  file) (filename  block))
               (set! (load-addr file) (load-addr block))
               (set! (exec-addr file) (exec-addr block))
