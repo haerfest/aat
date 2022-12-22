@@ -4,7 +4,8 @@
 
 (module (aat fs)
   (<fs>
-   id mount unmount items add remove)
+   id source items
+   mount unmount add remove)
 
   (import
     (aat identifiable)
@@ -22,4 +23,5 @@
   (define-generic (remove fs))
 
   (define-class <fs> (<identifiable>)
-    ((items accessor: items))))
+    ((source initform: #f accessor: source)
+     (items initform: '() accessor: items))))

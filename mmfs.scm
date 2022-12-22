@@ -8,7 +8,8 @@
 
 (module (aat mmfs)
   (<mmfs>
-   id mount unmount members)
+   id source items on-boot-0 on-boot-1 on-boot-2 on-boot-3
+   mount unmount)
 
   (import
     (aat file)
@@ -16,24 +17,28 @@
     (aat dfs)
     bitstring
     (chicken base)
+    (chicken format)
     (chicken io)
     coops
+    coops-primitive-objects
     scheme
     srfi-1)
 
-  (define-class <mmfs-slot> ())
   (define-class <mmfs> (<fs>)
     ((discs initform: (make-vector 511 #f) accessor: discs)
-     (slot0 initform: 0 accessor: slot0)
-     (slot1 initform: 0 accessor: slot1)
-     (slot2 initform: 0 accessor: slot2)
-     (slot3 initform: 0 accessor: slot3)))
+     (on-boot-0 initform: 0 accessor: on-boot-0)
+     (on-boot-1 initform: 0 accessor: on-boot-1)
+     (on-boot-2 initform: 0 accessor: on-boot-2)
+     (on-boot-3 initform: 0 accessor: on-boot-3)))
 
-  (define-method (mount (archive <mmfs>) (port <port>))
-    (parse archive (read-string #f port)))
+  (define-method (mount (archive <mmfs>))
+    (parse archive (read-string #f (source archive))))
+
+  (define-method (unmount (archive <mmfs>))
+    #f)
 
   (define-method (items (archive <mmfs>))
-    (filter (lambda (disc) disc) (vector->list (discs archive)))))
+    (filter (lambda (disc) disc) (vector->list (discs archive))))
 
 ;; -----------------------------------------------------------------------------
 
@@ -44,44 +49,49 @@
 
   (define (parse archive bitstr)
     (bitmatch bitstr
-      (((Slot0Low  8 unsigned)
-        (Slot1Low  8 unsigned)
-        (Slot2Low  8 unsigned)
-        (Slot3Low  8 unsigned)
-        (Slot0High 8 unsigned)
-        (Slot1High 8 unsigned)
-        (Slot2High 8 unsigned)
-        (Slot3High 8 unsigned)
-        (Catalog (* 8 (- 8192 16)) bitstring)
-        (Discs   bitstring))
+      (((OnBoot0Low  8 unsigned)
+        (OnBoot1Low  8 unsigned)
+        (OnBoot2Low  8 unsigned)
+        (OnBoot3Low  8 unsigned)
+        (OnBoot0High 8 unsigned)
+        (OnBoot1High 8 unsigned)
+        (OnBoot2High 8 unsigned)
+        (OnBoot3High 8 unsigned)
+        (_         (* 8 8 ) bitstring)
+        (Catalog   (* 8 (- 8192 16)) bitstring)
+        (Discs     bitstring))
        (begin
-        (set! (slot0 archive) (+ (* 65536 Slot0High) Slot0Low))
-        (set! (slot1 archive) (+ (* 65536 Slot1High) Slot1Low))
-        (set! (slot2 archive) (+ (* 65536 Slot2High) Slot2Low))
-        (set! (slot3 archive) (+ (* 65536 Slot3High) Slot3Low))
-        (parse-catalog archive Catalog)))))
+        (set! (on-boot-0 archive) (+ (* 65536 OnBoot0High) OnBoot0Low))
+        (set! (on-boot-1 archive) (+ (* 65536 OnBoot1High) OnBoot1Low))
+        (set! (on-boot-2 archive) (+ (* 65536 OnBoot2High) OnBoot2Low))
+        (set! (on-boot-3 archive) (+ (* 65536 OnBoot3High) OnBoot3Low))
+        (parse-discs archive Catalog Discs)))))
 
   (define (->discname bitstr)
-    (let* ((ascii-codes (bitstring->list bitstr 8))
-           (count       (list-index zero? ascii-codes)))
-      (list->string (map integer->char (take ascii-codes count)))))
+    (let* ((asciis (bitstring->list bitstr 8))
+           (count  (list-index zero? asciis)))
+      (list->string (map integer->char (take asciis count)))))
 
-  (define (parse-catalog archive bitstr #!optional (slot 0))
+  (define (parse-discs archive catalog-bitstr discs-bitstr
+                       #!optional (slot 0))
     (when (< slot 511)
-      (bitmatch bitstr
-        (((DiscName (* 12 8) bitstring)
+      (bitmatch catalog-bitstr
+        (((DiscName (* 8 12) bitstring)
           (#x00)
           (#x00)
           (#x00)
-          (Status   8)
+          (Status 8)
           (check (or (= Status +status-readonly+)
                      (= Status +status-readwrite+)
                      (= Status +status-unformatted+)
                      (= Status +status-invalid+)))
-          (Remaining bitstring))
-         (begin
-          (when (not (= Status +status-invalid+))
-            (let ((disc (make <dfs>)))
-              (set! (id disc) (cons (->discname DiscName) slot))
+          (RemainingCatalog bitstring))
+         (bitmatch discs-bitstr
+          (((Contents       (* 8 200 1024) bitstring)
+            (RemainingDiscs bitstring))
+           (when (not (= Status +status-invalid+))
+            (let ((disc (make <dfs> 'source Contents)))
+              (set! (id disc) (format #f "~A.~A" slot (->discname DiscName)))
               (vector-set! (discs archive) slot disc)))
-          (parse-catalog Remaining archive (+ slot 1))))))))
+           (parse-discs archive RemainingCatalog RemainingDiscs
+                        (+ slot 1)))))))))

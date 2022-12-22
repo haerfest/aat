@@ -8,7 +8,8 @@
 
 (module (aat uef)
   (<uef>
-   id mount unmount items)
+   id source items version
+   mount unmount)
 
   (import
     (aat file)
@@ -26,8 +27,8 @@
   (define-class <uef> (<fs>)
     ((version initform: '() accessor: version)))
 
-  (define-method (mount (tape <uef>) (port <port>))
-    (parse tape (read-string #f port)))
+  (define-method (mount (tape <uef>))
+    (parse tape (read-string #f (source tape))))
 
   (define-method (unmount (tape <uef>))
     #f)
@@ -73,8 +74,8 @@
         (Contents  (* 8 Size) bitstring)
         (Remaining bitstring))
        (let ((chunk (make <chunk>)))
-        (set! (id chunk)       Id)
-        (set! (size chunk)     Size)
+        (set! (id       chunk) Id)
+        (set! (size     chunk) Size)
         (set! (contents chunk) Contents)
         (parse-chunks Remaining (cons chunk chunks))))
       (else (reverse chunks))))

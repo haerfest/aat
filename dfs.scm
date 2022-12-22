@@ -9,8 +9,9 @@
 
 (module (aat dfs)
   (<dfs>
-   id mount unmount items
-   title write-cycle-count opt-4 sector-count)
+   id source items
+   title write-cycle-count opt-4 sector-count
+   mount unmount)
 
   (import
     (aat file)
@@ -32,8 +33,12 @@
      (opt-4             initform: 0  accessor: opt-4)
      (sector-count      initform: 0  accessor: sector-count)))
 
-  (define-method (mount (disc <dfs>) (port <port>))
-    (parse disc (read-string #f port)))
+  (define-method (mount (disc <dfs>))
+    (cond
+      ((input-port? (source disc))
+        (parse disc (read-string #f (source disc))))
+      ((bitstring? (source disc))
+        (parse disc (source disc)))))
 
   (define-method (unmount (disc <dfs>))
     #f)
