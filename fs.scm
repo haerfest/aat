@@ -1,27 +1,13 @@
-;; -----------------------------------------------------------------------------
-;; Represents a filesystem.
-;; -----------------------------------------------------------------------------
-
 (module (aat fs)
   (<fs>
-   id source items
-   mount unmount add remove)
+   fs-mount fs-unmount fs-members)
 
-  (import
-    (aat identifiable)
-    coops
-    scheme)
+  (import coops)
 
-  (define-generic (mount fs))
+  (define-class <fs> ())
 
-  (define-generic (unmount fs))
+  (define-generic (fs-mount (fs <fs>)))
 
-  (define-generic (members fs))
+  (define-generic (fs-unmount (fs <fs>)))
 
-  (define-generic (add fs))
-
-  (define-generic (remove fs))
-
-  (define-class <fs> (<identifiable>)
-    ((source initform: #f accessor: source)
-     (items initform: '() accessor: items))))
+  (define-generic (fs-members (fs <fs>))))

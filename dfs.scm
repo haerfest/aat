@@ -9,138 +9,74 @@
 
 (module (aat dfs)
   (<dfs>
-   id source items
-   title write-cycle-count opt-4 sector-count
-   mount unmount)
+   fs-mount fs-unmount fs-members)
 
   (import
-    (aat file)
     (aat fs)
+    (aat storage)
     bitstring
     (chicken base)
-    (chicken format)
-    (chicken io)
     coops
-    coops-primitive-objects
-    matchable
     scheme
-    srfi-1
     srfi-13)
 
   (define-class <dfs> (<fs>)
-    ((title             initform: "" accessor: title)
-     (write-cycle-count initform: 0  accessor: write-cycle-count)
-     (opt-4             initform: 0  accessor: opt-4)
-     (sector-count      initform: 0  accessor: sector-count)))
+    ((storage initform: #f  accessor: storage)
+     (files   initform: '() accessor: files  )))
 
-  (define-method (mount (disc <dfs>))
-    (cond
-      ((input-port? (source disc))
-        (parse disc (read-string #f (source disc))))
-      ((bitstring? (source disc))
-        (parse disc (source disc)))
-      (else
-        (error '???'))))
+  (define-method (fs-mount (fs <dfs>))
+    (st-open (storage fs) 'rd)
+    (read-catalog fs))
 
-  (define-method (unmount (disc <dfs>))
-    #f)
+  (define-method (fs-unmount (fs <dfs>))
+    (st-close (storage fs))
+    (set! (storage fs) #f))
 
-;; -----------------------------------------------------------------------------
+  (define-method (fs-members (fs <dfs>))
+    (files fs))
 
-  (define (read-file bitstr start-sector size)
-    (bitmatch bitstr
-      (((_        (* 8 256 start-sector) bitstring)
-        (Contents (* 8 size) bitstring)
-        (_        bitstring))
-       Contents)))
+  (define-method (sector (fs <dfs>) n)
+    (st-seek (storage fs) (* 256 n)))
 
-  (define (make-file args bitstr)
-    (match args
-      (((fn lckd?) (ld-addr ex-addr sz start-sector))
-        (let ((file (make <file>)))
-          (set! (id        file) (cons fn start-sector))
-          (set! (filename  file) fn)
-          (set! (locked?   file) lckd?)
-          (set! (load-addr file) ld-addr)
-          (set! (exec-addr file) ex-addr)
-          (set! (size      file) sz)
-          (set! (contents  file) (read-file bitstr start-sector sz))
-          file))))
+  (define-method (offset (fs <dfs>) n)
+    (st-seek (storage fs) (+ (st-tell (storage fs)) n)))
 
-  (define +max-file-count+ 31)
+  (define-method (read-catalog (fs <dfs>))
+    (sector fs 1) (offset fs 5)
+    (bitmatch (st-read (storage fs) 1)
+      (((FileCount 5) (_ 3))
+       (set! (files fs) (catalog-files fs FileCount)))))
 
-  (define (parse-filenames bitstr file-count #!optional (acc '()))
-    (if (zero? file-count)
-      (reverse acc)
-      (bitmatch bitstr
-        (((Filename  (* 8 7) bitstring)
-          (Locked?   1)
-          (Directory 7)
-          (Remainder bitstring))
-         (parse-filenames
-          Remainder
-          (- file-count 1)
-          (cons
-            (list
-              (format #f "~C.~A"
-                (integer->char Directory)
-                (string-trim-right (bitstring->string Filename) #\space))
-              (= 1 Locked?))
-            acc))))))
+  (define (18-bits hi 16-bits)
+    (+ (* hi #x10000) 16-bits))
 
-  (define (parse-attributes bitstr file-count #!optional (acc '()))
-    (if (zero? file-count)
-      (reverse acc)
-      (bitmatch bitstr
-        (((LoadAddr     16 little unsigned)
-          (ExecAddr     16 little unsigned)
-          (Size         16 little unsigned)
-          (ExecAddrHigh 2)
-          (SizeHigh     2)
-          (LoadAddrHigh 2)
-          (StartSector  10 big unsigned)
-          (Remainder    bitstring))
-         (parse-attributes
-          Remainder
-          (- file-count 1)
-          (cons
-            (list
-              (+ (* 65536 LoadAddrHigh) LoadAddr)
-              (+ (* 65536 ExecAddrHigh) ExecAddr)
-              (+ (* 65536 SizeHigh)     Size)
-              StartSector)
-            acc))))))
-
-  (define (parse disc bitstr)
-    (bitmatch bitstr
-      ((
-        ; first sector of 256 bytes
-        (DiskTitleFirst8  (* 8 8) bitstring)
-        (FilenamesAndDirs (* +max-file-count+ 8 (+ 7 1)) bitstring)
-        ; second sector of 256 bytes
-        (DiskTitleLast4   (* 4 8) bitstring)
-        (WriteCycleCount  8 unsigned)
-        (FileCountTimes8  8 unsigned)
-        (_ 2) (Opt4 2) (_ 2)
-        (SectorCount      10 big unsigned)
-        (FilesAttributes  (* +max-file-count+ 8 8) bitstring)
-        ; remaining sectors
-        (_ bitstring))
+  (define-method (catalog-file (fs <dfs>) index)
+    (sector fs 0) (offset fs (+ 8 (* index 8)))
+    (bitmatch (st-read (storage fs) 8)
+      (((FileNamePadded (* 7 8) bitstring)
+        (Locked         1)
+        (Directory      7))
        (begin
-        (set! (title disc)
-              (string-trim-right
-                (string-append (bitstring->string DiskTitleFirst8)
-                               (bitstring->string DiskTitleLast4))
-                (lambda (char) (or (eq? char #\space)
-                                                      (eq? char #\null)))))
-        (set! (write-cycle-count disc) WriteCycleCount)
-        (set! (opt-4 disc) Opt4)
-        (set! (sector-count disc) SectorCount)
-        (let* ((file-count (/ FileCountTimes8 8))
-               (filenames  (parse-filenames FilenamesAndDirs file-count))
-               (attributes (parse-attributes FilesAttributes file-count)))
-          (set! (items disc)
-            (map
-              (lambda (args)
-                (make-file args bitstr))
-              (zip filenames attributes)))))))))
+        (sector fs 1) (offset fs (+ 8 (* index 8)))
+        (bitmatch (st-read (storage fs) 8)
+          (((LoadAddress   16 little)
+            (ExecAddress   16 little)
+            (FileLength    16 little)
+            (ExecAddressHi  2)
+            (FileLengthHi   2)
+            (LoadAddressHi  2)
+            (StartSector   10 big))
+           (list (integer->char Directory)
+                 (string-trim-right (bitstring->string FileNamePadded))
+                 Locked
+                 (18-bits LoadAddressHi LoadAddress)
+                 (18-bits ExecAddressHi ExecAddress)
+                 (18-bits FileLengthHi  FileLength)
+                 StartSector)))))))
+
+  (define-method (catalog-files (fs <dfs>) file-count #!optional (files '()))
+    (if (= (length files) file-count)
+      files
+      (catalog-files fs file-count
+                     (cons (catalog-file fs (length files)) files)))))
+

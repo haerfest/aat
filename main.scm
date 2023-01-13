@@ -1,16 +1,20 @@
 (load "storage")
 (load "file-storage")
 (load "memory-storage")
+(load "fs")
+(load "dfs")
 
 (import
   (aat file-storage)
+  (aat dfs)
   (chicken format)
-  coops)
+  coops
+  scheme)
 
 (define (main)
-  (let ((beeb.mmb (make <file-storage> 'filepath "media/BEEB.MMB")))
-    (st-open beeb.mmb 'rdonly)
-    (format #t "Size: ~A~%" (st-size beeb.mmb))
-    (st-close beeb.mmb)))
+  (let ((elite (make <dfs> 'storage (make <file-storage> 'filepath "media/Elite.ssd"))))
+    (fs-mount elite)
+    (for-each (lambda (member) (format #t "~S~%" member)) (fs-members elite))
+    (fs-unmount elite)))
 
 (main)

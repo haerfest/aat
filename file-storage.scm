@@ -33,7 +33,7 @@
     (set! (port storage) #f))
 
   (define-method (st-read (storage <file-storage>) count)
-      (file-read (port storage) count))
+      (car (file-read (port storage) count)))
 
   (define-method (st-write (storage <file-storage>) data)
     (file-write
