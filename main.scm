@@ -6,15 +6,20 @@
 
 (import
   (aat file-storage)
+  (aat memory-storage)
   (aat dfs)
   (chicken format)
   coops
   scheme)
 
 (define (main)
-  (let ((elite (make <dfs> 'storage (make <file-storage> 'filepath "media/Elite.ssd"))))
-    (fs-mount elite)
-    (for-each (lambda (member) (format #t "~S~%" member)) (fs-members elite))
-    (fs-unmount elite)))
+  (let* ((file   (make <file-storage> 'filepath "media/Elite.ssd"))
+         (memory (make <memory-storage> 'backend file))
+         (dfs    (make <dfs> 'storage memory)))
+    (fs-mount dfs)
+    (for-each (lambda (member)
+                (format #t "~S~%" member))
+              (fs-members dfs))
+    (fs-unmount dfs)))
 
 (main)

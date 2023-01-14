@@ -21,11 +21,12 @@
   (define-method (st-open (storage <file-storage>) mode)
     (set! (port storage)
           (file-open (filepath storage)
-                     (cond
-                      ((eq? mode 'rdonly) open/rdonly)
-                      ((eq? mode 'wronly) open/wronly)
-                      ((eq? mode 'rdwr)   open/rdwr)
-                      (else               open/rdonly))))
+                     (+ open/binary
+                        (cond
+                         ((eq? mode 'rdonly) open/rdonly)
+                         ((eq? mode 'wronly) open/wronly)
+                         ((eq? mode 'rdwr)   open/rdwr)
+                         (else               open/rdonly)))))
     (set! (slot-value storage 'mode) mode))
 
   (define-method (st-close (storage <file-storage>))
