@@ -4,31 +4,20 @@
 
 (module (aat file)
   (<file>
-   id filename load-addr exec-addr size locked? contents
-   meta get-meta set-meta!)
+   f-id f-filename f-load-addr f-exec-addr f-size
+   f-locked? f-readable? f-writable? f-contents)
 
   (import
-    (aat identifiable)
     coops
-    coops-primitive-objects
     scheme)
 
-  (define-class <file> (<identifiable>)
-    ((filename  initform: ""  accessor: filename)
-     (load-addr initform: 0   accessor: load-addr)
-     (exec-addr initform: 0   accessor: exec-addr)
-     (size      initform: 0   accessor: size)
-     (locked?   initform: #f  accessor: locked?)
-     (contents  initform: ""  accessor: contents)
-     (meta      initform: '() accessor: meta)))
-
-  (define-method (get-meta (file <file>) (key <symbol>))
-    (let ((existing (assq key (meta file))))
-      (and existing (cdr existing))))
-
-  (define-method (set-meta! (file <file>) (key <symbol>) (value #t))
-    (let ((existing (assq key (meta file))))
-      (if existing
-        (set! (cdr existing) value)
-        (set! (meta file)
-          (cons (cons key value) (meta file)))))))
+  (define-class <file> ()
+    ((id        initform: 0   accessor: f-id)
+     (filename  initform: ""  accessor: f-filename)
+     (load-addr initform: 0   accessor: f-load-addr)
+     (exec-addr initform: 0   accessor: f-exec-addr)
+     (size      initform: 0   accessor: f-size)
+     (locked?   initform: #f  accessor: f-locked?)
+     (readable? initform: #t  accessor: f-readable?)
+     (writable? initform: #t  accessor: f-writable?)
+     (contents  initform: #f  accessor: f-contents))))

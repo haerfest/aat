@@ -1,3 +1,5 @@
+(load "file")
+(load "directory")
 (load "storage")
 (load "file-storage")
 (load "memory-storage")
@@ -5,6 +7,7 @@
 (load "dfs")
 
 (import
+  (aat file)
   (aat file-storage)
   (aat memory-storage)
   (aat dfs)
@@ -18,7 +21,7 @@
          (dfs    (make <dfs> 'storage memory)))
     (fs-mount dfs)
     (for-each (lambda (member)
-                (format #t "~S~%" member))
+                (format #t "~A~%" (f-id member)))
               (fs-members dfs))
     (fs-unmount dfs)))
 

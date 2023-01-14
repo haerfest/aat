@@ -12,10 +12,13 @@
    fs-mount fs-unmount fs-members)
 
   (import
+    (aat directory)
+    (aat file)
     (aat fs)
     (aat storage)
     bitstring
     (chicken base)
+    (chicken format)
     coops
     scheme
     srfi-13)
@@ -50,6 +53,10 @@
   (define (18-bits hi 16-bits)
     (+ (* hi #x10000) 16-bits))
 
+  (define-class <dfs-file> (<file>)
+    ((directory    accessor: f-directory)
+     (start-sector accessor: f-start-sector)))
+
   (define-method (catalog-file (fs <dfs>) index)
     (sector fs 0) (offset fs (+ 8 (* index 8)))
     (bitmatch (st-read (storage fs) 8)
@@ -66,13 +73,24 @@
             (FileLengthHi   2)
             (LoadAddressHi  2)
             (StartSector   10 big))
-           (list (integer->char Directory)
-                 (string-trim-right (bitstring->string FileNamePadded))
-                 Locked
-                 (18-bits LoadAddressHi LoadAddress)
-                 (18-bits ExecAddressHi ExecAddress)
-                 (18-bits FileLengthHi  FileLength)
-                 StartSector)))))))
+           (let ((directory (integer->char Directory))
+                 (filename  (string-trim-right
+                              (bitstring->string FileNamePadded)))
+                 (size      (18-bits FileLengthHi FileLength)))
+            (make <dfs-file>
+              'directory    directory
+              'start-sector StartSector
+              'id           (format #f "~C.~A" directory filename)
+              'filename     filename
+              'load-addr    (18-bits LoadAddressHi LoadAddress)
+              'exec-addr    (18-bits ExecAddressHi ExecAddress)
+              'size         size
+              'locked?      (= Locked 1)
+              'readable?    #t
+              'writable?    #t
+              'contents     (lambda ()
+                                (sector StartSector)
+                                (st-read (storage fs) size))))))))))
 
   (define-method (catalog-files (fs <dfs>) file-count #!optional (files '()))
     (if (= (length files) file-count)
