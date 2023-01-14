@@ -9,6 +9,7 @@
 
 (module (aat dfs)
   (<dfs>
+   to-string
    fs-mount fs-unmount fs-members)
 
   (import
@@ -56,6 +57,12 @@
   (define-class <dfs-file> (<file>)
     ((directory    accessor: f-directory)
      (start-sector accessor: f-start-sector)))
+
+  (define-method (to-string (file <dfs-file>))
+    (format #f "~A dir=~C sector=~A"
+      (call-next-method)
+      (f-directory file)
+      (f-start-sector file)))
 
   (define-method (catalog-file (fs <dfs>) index)
     (sector fs 0) (offset fs (+ 8 (* index 8)))

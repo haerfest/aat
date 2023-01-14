@@ -21,7 +21,7 @@
          (dfs    (make <dfs> 'storage memory)))
     (fs-mount dfs)
     (for-each (lambda (member)
-                (format #t "~A~%" (f-id member)))
+                (format #t "~A~%" (to-string member)))
               (fs-members dfs))
     (fs-unmount dfs)))
 
