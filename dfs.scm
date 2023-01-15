@@ -149,7 +149,7 @@
               'readable?    #t
               'writable?    #t
               'contents     (lambda ()
-                                (sector StartSector)
+                                (sector fs StartSector)
                                 (st-read (storage fs) size))))))))))
 
   (define-method (catalog-files (fs <dfs>) file-count #!optional (files '()))
