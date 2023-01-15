@@ -10,4 +10,6 @@
 
   (define-generic (fs-unmount (fs <fs>)))
 
-  (define-generic (fs-members (fs <fs>))))
+  (define-generic (fs-members (fs <fs>)))
+
+  (define-generic (fs-add (fs <fs>) file filepath)))
