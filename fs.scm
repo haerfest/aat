@@ -1,6 +1,6 @@
 (module (aat fs)
   (<fs>
-   fs-mount fs-unmount fs-members)
+   fs-mount fs-unmount fs-members fs-add fs-remove)
 
   (import coops)
 
@@ -12,4 +12,6 @@
 
   (define-generic (fs-members (fs <fs>)))
 
-  (define-generic (fs-add (fs <fs>) file filepath)))
+  (define-generic (fs-add (fs <fs>) file filespec))
+
+  (define-generic (fs-remove (fs <fs>) filespec)))
