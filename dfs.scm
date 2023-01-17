@@ -28,6 +28,8 @@
 
   ;; --------------------------------------------------------------------------
 
+  (define bytes/sector 256)
+
   ;; A DFS has an underlying STORAGE mechanism, a SECTORS-COUNT to indicate the
   ;; capacity of the disk (a sector is 256 bytes), and a CATALOG of files.
   ;; Note that the catalog is in reverse order: the first file in the catalog
@@ -113,8 +115,8 @@
         (values #\$ filespec))))
 
   (define (needed-sectors-count size)
-    (+ (quotient size 256)
-       (zero? (remainder size 256) 0 1)))
+    (+ (quotient size bytes/sector)
+       (zero? (remainder size bytes/sector) 0 1)))
 
   (define (first-available-sector fs)
     (apply max (cons 2 (map (lambda (file)
@@ -125,7 +127,7 @@
     (- (sectors-count fs) (first-available-sector fs)))
 
   (define (sector fs n #!optional (offset 0))
-    (st-seek (storage fs) (+ (* 256 n) offset)))
+    (st-seek (storage fs) (+ (* n bytes/sector) offset)))
 
   (define (read-catalog fs)
     (define (inner file-count files)
