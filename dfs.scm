@@ -28,6 +28,10 @@
 
   ;; --------------------------------------------------------------------------
 
+  ;; A DFS has an underlying STORAGE mechanism, a SECTORS-COUNT to indicate the
+  ;; capacity of the disk (a sector is 256 bytes), and a CATALOG of files.
+  ;; Note that the catalog is in reverse order: the first file in the catalog
+  ;; is the last file on disk, i.e., the file with the highest start sector.
   (define-class <dfs> (<fs>)
     ((storage       accessor: storage)
      (sectors-count accessor: sectors-count)
@@ -124,12 +128,18 @@
     (st-seek (storage fs) (+ (* 256 n) offset)))
 
   (define (read-catalog fs)
+    (define (inner file-count files)
+      (if (zero? file-count)
+        files
+        (inner (sub1 file-count)
+               (cons (catalog-file fs (sub1 file-count))
+                     files))))
     (sector fs 1 5)
     (bitmatch (st-read (storage fs) 3)
       (((FileCount 5) (_ 3)
         (_ 6) (SectorCount 10 big))
        (begin
-        (set! (catalog fs) (catalog-files fs FileCount))
+        (set! (catalog fs) (inner FileCount '()))
         (set! (sectors-count fs) SectorCount)))))
 
   (define (18-bits hi 16-bits)
@@ -170,12 +180,6 @@
                                    'writable?    (= Locked 0))))
              (set! (f-contents file) (make-reader fs file))
              file)))))))
-
-  (define (catalog-files fs file-count #!optional (files '()))
-    (if (= (length files) file-count)
-      files
-      (catalog-files fs file-count
-                     (cons (catalog-file fs (length files)) files))))
 
   (define (pad str n)
     (if (>= n (string-length str))
