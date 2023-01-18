@@ -133,9 +133,9 @@
     (define (inner file-count files)
       (if (zero? file-count)
         files
-        (inner (sub1 file-count)
-               (cons (catalog-file fs (sub1 file-count))
-                     files))))
+        (let ((one-less (sub1 file-count)))
+          (inner one-less (cons (catalog-file fs one-less)
+                                files)))))
     (sector fs 1 5)
     (bitmatch (st-read (storage fs) 3)
       (((FileCount 5) (_ 3)
@@ -166,20 +166,20 @@
             (ExecAddressHi 2) (FileLengthHi 2) (LoadAddressHi 2)
             (StartSector   10 big))
            (let* ((directory (integer->char Directory))
-                  (filename  (string-trim-right
-                               (bitstring->string FileNamePadded)))
-                  (size      (18-bits FileLengthHi FileLength))
-                  (file      (make <dfs-file>
-                                   'directory    directory
-                                   'start-sector StartSector
-                                   'id           (format #f "~C.~A" directory filename)
-                                   'filename     filename
-                                   'load-addr    (18-bits LoadAddressHi LoadAddress)
-                                   'exec-addr    (18-bits ExecAddressHi ExecAddress)
-                                   'size         size
-                                   'locked?      (= Locked 1)
-                                   'readable?    (= Locked 0)
-                                   'writable?    (= Locked 0))))
+                  (filename (string-trim-right
+                              (bitstring->string FileNamePadded)))
+                  (size (18-bits FileLengthHi FileLength))
+                  (file (make <dfs-file>
+                              'directory    directory
+                              'start-sector StartSector
+                              'id           (format #f "~C.~A" directory filename)
+                              'filename     filename
+                              'load-addr    (18-bits LoadAddressHi LoadAddress)
+                              'exec-addr    (18-bits ExecAddressHi ExecAddress)
+                              'size         size
+                              'locked?      (= Locked 1)
+                              'readable?    (= Locked 0)
+                              'writable?    (= Locked 0))))
              (set! (f-contents file) (make-reader fs file))
              file)))))))
 
