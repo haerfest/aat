@@ -1,6 +1,6 @@
 (module (aat file-storage)
   (<file-storage>
-   st-mode st-open st-close st-read st-write st-size st-tell st-seek)
+  st-open st-close st-read st-write st-size st-tell st-seek)
 
   (import
     (aat storage)
@@ -12,22 +12,12 @@
 
   (define-class <file-storage> (<storage>)
     ((filepath initform: #f  accessor: filepath)
-     (port     initform: #f  accessor: port)
-     (mode)))
+     (port     initform: #f  accessor: port)))
 
-  (define-method (st-mode (storage <file-storage>))
-    (slot-value storage 'mode))
-
-  (define-method (st-open (storage <file-storage>) mode)
+  (define-method (st-open (storage <file-storage>))
     (set! (port storage)
-          (file-open (filepath storage)
-                     (+ open/binary
-                        (cond
-                         ((eq? mode 'rdonly) open/rdonly)
-                         ((eq? mode 'wronly) open/wronly)
-                         ((eq? mode 'rdwr)   open/rdwr)
-                         (else               open/rdonly)))))
-    (set! (slot-value storage 'mode) mode))
+      (file-open (filepath storage)
+                 (+ open/binary open/rdwr open/creat))))
 
   (define-method (st-close (storage <file-storage>))
     (file-close (port storage))

@@ -1,6 +1,6 @@
 (module (aat storage)
   (<storage>
-   st-mode st-open st-close st-read st-write st-size st-tell st-seek)
+   st-open st-close st-read st-write st-size st-tell st-seek)
 
   (import
     coops
@@ -8,9 +8,7 @@
 
   (define-class <storage> ())
 
-  (define-generic (st-mode (storage <storage>)))
-
-  (define-generic (st-open (storage <storage>) mode))
+  (define-generic (st-open (storage <storage>)))
 
   (define-generic (st-close (storage <storage>)))
 

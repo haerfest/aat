@@ -40,7 +40,7 @@
      (catalog       accessor: catalog)))
 
   (define-method (fs-mount (fs <dfs>))
-    (st-open (storage fs) 'rd)
+    (st-open (storage fs))
     (read-catalog fs))
 
   (define-method (fs-unmount (fs <dfs>))
