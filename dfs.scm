@@ -120,7 +120,7 @@
 
   (define (first-available-sector fs)
     (apply max (cons 2 (map (lambda (file)
-                              (+ (last-sector file) 1))
+                              (add1 (last-sector file)))
                             (catalog fs)))))
 
   (define (available-sectors-count fs)
